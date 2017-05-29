@@ -1,6 +1,6 @@
 #Data from Maranon about size fractionated Chl and NPP:
 setwd('~/Working/Global_PP')
-dat = 'size_Chl.csv'  #Maranon data
+dat = '~/Working/Global_PP/size_Chl.csv'  #Maranon data
 dat = read.csv(dat)  #For Seed I, Large fraction is > 10 um
 dat = dat[!is.na(dat$chl0.2),]
 dat = dat[!is.na(dat$chl20),]
@@ -79,8 +79,6 @@ points(K2size$chlt,K2size$picop,col=2)
 points(S1size$chlt,S1size$picop,col=3)
 
 dev.off()
-
-
 
 plot(Dat0$chlt, Dat0$microp, log = 'x',
      xlab = 'Total Chl (µg/L)',
