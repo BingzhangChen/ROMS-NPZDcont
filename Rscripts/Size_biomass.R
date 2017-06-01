@@ -10,18 +10,23 @@ load('PHY0m.Rdata')
 
 #Load total Chl:
 load('Chl0m.Rdata')
-Chl0m$Dat[Chl0m$Dat <= 0] <- NA
+Chl0m$Dat[Chl0m$Dat <= 0]        <- NA
 Chl0m$Dat[!is.finite(Chl0m$Dat)] <- NA
 
 #Load mean size data:
 load('LNV0m.Rdata')
-LNV0m$Dat[LNV0m$Dat <= 0] <- NA
+LNV0m$Dat[LNV0m$Dat <= 0]        <- NA
 LNV0m$Dat[!is.finite(LNV0m$Dat)] <- NA
 
 #Load size variance data:
 load('VAR0m.Rdata')
-VAR0m$Dat[VAR0m$Dat <= 0] <- NA
+VAR0m$Dat[VAR0m$Dat <= 0]        <- NA
 VAR0m$Dat[!is.finite(VAR0m$Dat)] <- NA
+
+#Load NPP:
+load('NPP0m.Rdata')
+NPP0m$Dat[NPP0m$Dat <= 0]        <- NA
+NPP0m$Dat[!is.finite(NPP0m$Dat)] <- NA
 
 #Calculate the microphytoplankton fraction:
 Nlon   <- dim(LNV0m$Dat)[1]
@@ -63,7 +68,7 @@ op <- par(font.lab  = 1,
 plot(as.vector(Chl.ann), as.vector(picop.ann), log='x',
      xlab= '',
      ylab= '%Pico',
-     xlim= c(0.02,25),
+     xlim= c(0.02,25), ylim=c(0,1),
      pch = 16, cex = .2)
 points(dat$chltot, dat$chl0.2p, col=2)
 points(K2size$chlt,K2size$picop,pch=2,col=3)
@@ -75,7 +80,7 @@ legend('topright',legend=c('Model','Global','K2','S1'),
 plot(as.vector(Chl.ann), as.vector(nanop.ann), log='x',
      xlab= '',
      ylab= '%Nano',
-     xlim= c(0.02,25),
+     xlim= c(0.02,25), ylim=c(0,1),
      pch = 16, cex = .2)
 points(dat$chltot, dat$chl2p, col=2)
 points(K2size$chlt,K2size$nanop,pch=2,col=3)
@@ -85,12 +90,37 @@ par(mar    = c(4,4,1.5,0.5))
 plot(as.vector(Chl.ann), as.vector(microp.ann), log='x',
      xlab= 'Total Chl a (µg/L)',
      ylab= '%Micro',
-     xlim= c(0.02,25),
+     xlim= c(0.02,25), ylim=c(0,1),
      pch = 16, cex = .2)
 points(dat$chltot, dat$chl20p, col=2)
 points(K2size$chlt,K2size$microp,pch=2,col=3)
 points(S1size$chlt,S1size$microp,pch=2,col=4)
 dev.off()
+
+#Calculate the Global NPP~size diversity relationship:
+
+#Calculate annual mean of size variance:
+VAR.ann <- apply(VAR0m$Dat, c(1,2), mean)
+
+#Calculate annual mean of NPP:
+NPP.ann <- apply(NPP0m$Dat, c(1,2), mean)
+
+#Plot NPP (log scale) against VAR:
+dat     <- data.frame(VAR = as.vector(VAR.ann),
+                      NPP = as.vector(NPP.ann))
+dat     <- na.omit(dat)
+
+plot(dat$VAR, dat$NPP, log='y',
+     xlab= 'Size diversity',
+     ylab= 'Primary production (µgC/L/d)',
+     xlim= c(1,25), ylim=c(0.1,100),
+     pch = 16, cex = .2)
+
+#Add global obs. data
+#Read data:
+file <- '~/Working/Global_PP/size_NPP.csv'
+dat  <- read.csv(file)
+#
 #df <- data.frame(Chl   = as.vector(log(Chl.ann)),
 #                 micro = as.vector(microp.ann),
 #                 nano  = as.vector(nanop.ann),
@@ -112,7 +142,6 @@ dev.off()
 #         # family = "serif", size=4)+
 #         LO_theme
 #
-##Add global obs. data
 #xx  <- xx +
 #       geom_point(data=dat, mapping=aes(x=log(chltot),y=chl0.2p))
 

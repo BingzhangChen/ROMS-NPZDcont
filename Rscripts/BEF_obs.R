@@ -15,9 +15,7 @@ for (i in 1:nrow(dat)){
                                  cff != 'HK2007' &&
                                  cff != 'SCS2007'){
         dat[i,'date'] = as.Date(dat[i,'date'])
-       
     }
-
 }
 
 dat0 = dat[dat$depth <=5,]
