@@ -2,8 +2,12 @@
 nameit = 'npacific'
 pwd1   = 'npacific'
 library(ggplot2)
+library(MASS)
+library(plot3D)
 source('~/Working/FlexEFT1D/Rscripts/LO_theme.R')
 setwd(paste0('~/Roms_tools/Run/',pwd1))
+jet.colors <- colorRampPalette(c("#00007F", "blue", "#007FFF", "cyan",
+                     "#7FFF7F", "yellow", "#FF7F00", "red", "#7F0000"))  #A good color
 
 #Load total biomass:
 load('PHY0m.Rdata')
@@ -56,6 +60,13 @@ picop.ann  <- apply(picop, c(1,2), mean)
  nanop.ann[nanop.ann  <= 0] <- NA
 microp.ann[microp.ann <= 0] <- NA
 
+#Use daily data for size-fractionated Chl:
+CHL        <- data.frame(Tchl  =  as.vector(Chl0m$Dat),
+                        microp =  as.vector(microp),
+                         nanop =  as.vector(nanop),
+                         picop =  as.vector(picop))
+CHL        <- na.omit(CHL)
+dff        <- sample(1:nrow(CHL)
 pdf('Size_fraction_model_obs.pdf',width=5,height=8,paper='a4')
 op <- par(font.lab  = 1,
              family ="serif",
@@ -71,8 +82,8 @@ plot(as.vector(Chl.ann), as.vector(picop.ann), log='x',
      xlim= c(0.02,25), ylim=c(0,1),
      pch = 16, cex = .2)
 points(dat$chltot, dat$chl0.2p, col=2)
-points(K2size$chlt,K2size$picop,pch=2,col=3)
-points(S1size$chlt,S1size$picop,pch=2,col=4)
+points(K2size$chlt,K2size$picop,col=3)
+points(S1size$chlt,S1size$picop,col=4)
 legend('topright',legend=c('Model','Global','K2','S1'),
         cex=1.2,
         pch=c(16,1,2,2),col=1:4)
@@ -105,21 +116,69 @@ VAR.ann <- apply(VAR0m$Dat, c(1,2), mean)
 #Calculate annual mean of NPP:
 NPP.ann <- apply(NPP0m$Dat, c(1,2), mean)
 
-#Plot NPP (log scale) against VAR:
-dat     <- data.frame(VAR = as.vector(VAR.ann),
+#Plot Annual NPP (log scale) against VAR:
+DAT     <- data.frame(VAR = as.vector(VAR.ann),
                       NPP = as.vector(NPP.ann))
-dat     <- na.omit(dat)
+DAT     <- na.omit(DAT)
 
-plot(dat$VAR, dat$NPP, log='y',
-     xlab= 'Size diversity',
-     ylab= 'Primary production (µgC/L/d)',
-     xlim= c(1,25), ylim=c(0.1,100),
-     pch = 16, cex = .2)
+#Plot daily NPP (log scale) against VAR:
+DAT2    <- data.frame(VAR = as.vector(VAR0m$Dat),
+                      NPP = as.vector(NPP0m$Dat))
+DAT2    <- na.omit(DAT2)
+dff     <- sample(1:nrow(DAT2), 5E5)
+DAT2    <- DAT2[dff,]
 
 #Add global obs. data
 #Read data:
 file <- '~/Working/Global_PP/size_NPP.csv'
 dat  <- read.csv(file)
+
+#Remove NA data:
+dat  <- dat[,c('chl0.2','chl2','chl20','NPP')]
+dat  <- na.omit(dat)
+
+#Calculate size diversity based on size-fractionated Chl:
+dat$PMU <- NA   #Mean log size
+dat$VAR <- NA   #Log size variance
+
+X       <- c(2, 20)
+X       <- log(X)
+MUsig   <- function(Y, X){   #Y: the cumulative probability of size fraction
+                             #X: Log size
+    stopifnot(length(Y)==length(X))
+    Yq   <- qnorm(Y)
+    LM   <- lm(X ~ Yq)
+    LM   <- as.numeric(coef(LM))
+    PMU  <- LM[1]  # logESD
+    VAR  <- LM[2]
+    return(list(PMU = PMU, VAR = VAR))
+}
+
+#Calculate cumulative probability function:
+dat$Tchl <- apply(dat[ , 1:3], 1, sum)
+dat$p2   <- dat$chl0.2/dat$Tchl
+dat$p20  <- (dat$chl0.2 + dat$chl2)/dat$Tchl
+dat$p20  <- sapply(1:nrow(dat), function(i)min(dat$p20[i],.9999))
+
+dat$PMU  <- sapply(1:nrow(dat), function(i)MUsig(Y = c(dat$p2[i], dat$p20[i]), X)$PMU)
+dat$VAR  <- sapply(1:nrow(dat), function(i)MUsig(Y = c(dat$p2[i], dat$p20[i]), X)$VAR)
+
+f2       <- kde2d(DAT2$VAR, DAT2$NPP, n = 50, lims = c(1, 5, .1, 36))
+
+pdf('SizeDiversity_NPP.pdf',width=6,height=6,paper='a4')
+op <- par(font.lab  = 1,
+             family ="serif",
+             mar    = c(4,4,1.5,3),
+             mgp    = c(2.3,1,0),
+             oma    = c(4,4,0,0),
+             mfcol  = c(1,1), pch=16, cex=.8, 
+             cex.lab=1.2,cex.axis=1.2 ) 
+image2D(f2, col = jet.colors(20),  # zlim = c(0,.05), 
+           xlab = expression("Size diversity ((Ln "*µm^3*')'^2*")"), 
+           ylab = expression("Primary production (µgC"*' '*L^-1*' '*d^-1*")"))
+points(dat$VAR, dat$NPP, cex=.6,pch=16, col=2)
+dev.off()
+
 #
 #df <- data.frame(Chl   = as.vector(log(Chl.ann)),
 #                 micro = as.vector(microp.ann),

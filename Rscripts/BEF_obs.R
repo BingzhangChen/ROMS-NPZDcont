@@ -40,6 +40,7 @@ sizeStn = function(Stn){
 K2size = sizeStn('K2')
 S1size = sizeStn('S1')
 
+
 pdf('Size_fraction_wK2S1.pdf',width=3,height=7,paper='a4')
 op <- par(font.lab  = 1,
              family ="serif",
