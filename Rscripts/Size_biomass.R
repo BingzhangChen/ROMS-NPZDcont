@@ -67,6 +67,7 @@ CHL        <- data.frame(Tchl  =  as.vector(Chl0m$Dat),
                          picop =  as.vector(picop))
 CHL        <- na.omit(CHL)
 dff        <- sample(1:nrow(CHL)
+CHL        <- CHL[dff, ]
 pdf('Size_fraction_model_obs.pdf',width=5,height=8,paper='a4')
 op <- par(font.lab  = 1,
              family ="serif",
