@@ -174,9 +174,11 @@ op <- par(font.lab  = 1,
              oma    = c(4,4,0,0),
              mfcol  = c(1,1), pch=16, cex=.8, 
              cex.lab=1.2,cex.axis=1.2 ) 
+
 image2D(f2, col = jet.colors(20),  # zlim = c(0,.05), 
            xlab = expression("Size diversity ((Ln "*µm^3*')'^2*")"), 
            ylab = expression("Primary production (µgC"*' '*L^-1*' '*d^-1*")"))
+
 points(dat$VAR, dat$NPP, cex=.6,pch=16, col=2)
 dev.off()
 

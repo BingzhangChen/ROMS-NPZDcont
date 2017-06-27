@@ -59,11 +59,6 @@ shannon  <- function(x) {
 }
 dat$SWH  <- sapply(1:nrow(dat), 
               function(i)shannon(c(dat$chl20p[i], dat$chl2p[i], dat$chl0.2p[i])))
-pdf('Shannon_size_diversity.pdf')
-plot(DAT$SWH, DAT$R_VAR, pch=16, ylim=c(0,4),
-           xlab = 'Shannon index',
-           ylab = expression("Size diversity ((Ln "*µm^3*')'^2*")"))
-dev.off()
 
 
 #Combine three datasets:
