@@ -114,9 +114,18 @@ source('~/Roms_tools/Rscripts/TS_2box.R')
 #Calculate variability of NO3:
 load('~/Roms_tools/Run/npacific/NO30m.Rdata')
 #NO3   <- get_sur('NO3_roms',  file = avgfile)
+CV    <- function(x)sd(x,na.rm=T)/mean(x,na.rm=T)
 NO3_v <- apply(NO30m$Dat, c(1,2), CV)
 
-pdf('NO3_var_mu_diff.pdf',width=5, height=4,paper='a4')
+#Calculate kernel densities of NO3_v vs. muAvg.dff:
+f2   <- data.frame(x=as.vector(NO3_v), y=as.vector(muAvg.dff))
+f2   <- na.omit(f2)
+#f2   <- kde2d(f2$x, f2$y, n = 50, lims = c(0, 1.5, -0.18, .18))
+cor.test(f2$x, f2$y)
+N    <- 5000
+f3   <- sample(1:nrow(f2), N) 
+f3   <- f2[f3,]
+pdf('NO3_var_mu_diff_H.pdf',width=5, height=4,paper='a4')
 op <- par( font.lab  = 1,
              family  ="serif",
              mar     = c(4,4,1,1),
@@ -125,13 +134,18 @@ op <- par( font.lab  = 1,
              pch     = 16,
              mfrow   = c(1,2))
   #NPP.dff1 <- log(muAvg.ann/muAvg1.ann)
-  Z_lim    <- c(-.2,.2)
+  Z_lim    <- c(-.18,.18)
   zones=matrix(c(1,2), ncol=2, byrow=TRUE)
   layout(zones, widths=c(4/5,1/5))
   par(mar=c(4,4,1,.1))
-  plot(as.vector(NO3_v), as.vector(muAvg.dff),pch=16, cex=.6, ylim=Z_lim,
+
+  #image2D(f2, col = jet.colors(20), colkey=F, # zlim = c(0,.05), 
+  #     xlab='Variability of DIN',ylab='Effect of diversity on productivity')
+  plot(f3$x, f3$y,pch=16, cex=.6, ylim=Z_lim,
        xlab='Variability of DIN',ylab='Effect of diversity on productivity')
+
   abline(0,0, lty=2)
+  abline(lm(y ~ x, f2))
   ds    = dat_lim(as.vector(muAvg.dff), Z_lim)
   yhist = hist(ds, plot=FALSE, breaks=25)
   par(mar=c(4,0,1,.1))
