@@ -164,7 +164,8 @@ dat$p20  <- sapply(1:nrow(dat), function(i)min(dat$p20[i],.9999))
 dat$PMU  <- sapply(1:nrow(dat), function(i)MUsig(Y = c(dat$p2[i], dat$p20[i]), X)$PMU)
 dat$VAR  <- sapply(1:nrow(dat), function(i)MUsig(Y = c(dat$p2[i], dat$p20[i]), X)$VAR)
 
-f2       <- kde2d(DAT2$VAR, DAT2$NPP, n = 50, lims = c(1, 5, .1, 36))
+f2       <- kde2d(DAT2$NPP, DAT2$VAR, n = 50, 
+            lims = c(.1, 36, 1, 5))
 
 pdf('SizeDiversity_NPP.pdf',width=6,height=6,paper='a4')
 op <- par(font.lab  = 1,
@@ -176,10 +177,10 @@ op <- par(font.lab  = 1,
              cex.lab=1.2,cex.axis=1.2 ) 
 
 image2D(f2, col = jet.colors(20),  # zlim = c(0,.05), 
-           xlab = expression("Size diversity ((Ln "*µm^3*')'^2*")"), 
-           ylab = expression("Primary production (µgC"*' '*L^-1*' '*d^-1*")"))
+           ylab = expression("Size diversity ((Ln "*µm^3*')'^2*")"), 
+           xlab = expression("Primary production (µgC"*' '*L^-1*' '*d^-1*")"))
 
-points(dat$VAR, dat$NPP, cex=.6,pch=16, col=2)
+points(dat$NPP, dat$VAR, cex=.6,pch=16, col=2)
 dev.off()
 
 #
