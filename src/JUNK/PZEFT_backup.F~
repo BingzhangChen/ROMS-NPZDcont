@@ -1,0 +1,843 @@
+! THis is a module based on an Optimality-based NPZD model that can couple with
+! other physical (0D,1D,3D) hosts.
+! The optimal phytoplankton growth part based on Pahlow et al. MEPS 2013.
+! The optimal zooplankton grazing part based on Pahlow & Prowe MEPS 2010.
+! Original structure taken from GOTM and adapted for FABM by Jorn Bruggeman. 
+! !Add the component of optimal current feeding on 20150309 
+      MODULE PZEFT
+   
+      implicit none
+      private
+! PUBLIC DERIVED TYPES:
+      type,public :: type_PZEFT   ! Define a type
+!     Variable identifiers
+! Input variables: (These variables must be provided in the host model)
+!-------------------------------------------------------------------------------
+! Modify input data and parameters as vectors (to facilitate MCMC fitting)
+      integer,parameter :: NENV=11, NPAR=
+      real(8) :: NO3,PHY,ZOO,DET,PMU,VAR,CHL,par,tC,I_0,dtdays
+!-------------------------------------------------------------------------------
+! The following parameters are internal and should be parameterized in the 'initialize' subroutine
+      real(8) :: mu0star,alphamu,aIstar,alphaI,A0star,alphaA,K0star,
+     &           alphaK
+      real(8) :: V0star,alphaV,Q0star,alphaQ,fV_initial
+      real(8) :: w_p,w_d,kc
+      real(8) :: gmax,kp,rdn,rpdu,rpdl,Ea,zetaN,RMchl,zetaChl,mz,Tr,
+     &           alphaG
+      real(8) :: beta,Ca,Cf,Emax,RMzoo
+      integer :: nutrient_uptake,grazing_formulation
+      logical :: fV_opt,CF_opt
+! Output variables (to be used by the host model): 
+!-------------------------------------------------------------------------------
+      real :: Theta,ThetaAvg,QNavg,muNet,dmuNetdl,d2muNetdl2,fV,w_pAvg
+      real :: AE,INGES,RES,NGR,EGES,gbar,dgdlbar,d2gdl2bar
+      real :: dPMUdt,dVARdt,dPHYdt,dNO3dt,dZOOdt,dDETdt        ! For ODE
+      real :: cc(4),pp(4,4),dd(4,4)        ! For PPDD
+!-------------------------------------------------------------------------------
+      contains
+         procedure :: initialize
+         procedure :: tf=>temp
+         procedure :: growth
+         procedure :: OCF
+         procedure :: ODE
+         procedure :: modified_patankar_2
+      end type type_PZEFT
+!-----------------------------------------------------------------------
+   
+      contains
+   
+!-----------------------------------------------------------------------
+!
+! !IROUTINE: Initialise the PZEFT model
+!
+! !INTERFACE:
+      subroutine initialize(self)
+! !INPUT PARAMETERS:
+      class (type_PZEFT), intent(inout), target :: self 
+
+      real :: mu0star,aIstar,alphaI,A0star,alphaA,V0star,
+     & alphaV,K0star,alphaK,alphaG,Q0star,alphaQ,alphaW,
+     & w31_p,w31_d,kc,gmax,kp
+      
+!      integer :: grazing_formulation,nutrient_uptake,error,reason
+!      logical :: fV_opt,CF_opt
+      integer, parameter :: stdout=6
+
+!      namelist /param_nml/ mu0star,alphamu,aIstar,alphaI,A0star,alphaA,
+!     &                     V0star, alphaV, K0star,alphaK,alphaG,Q0star,
+!     &                     alphaQ, fV_initial, w_p, w_d, kc, gmax,kp,
+!     &                     rdn, rpdu, rpdl,Ea,mz,zetaN,RMchl,zetaChl,
+!     &                     fV_opt,nutrient_uptake,grazing_formulation,
+!     &                     Tr,CF_opt,beta,Ca,Cf,Emax,RMzoo
+
+       mu0star    = 3.0    ! Will be evaluated
+       aIstar     = 0.05 !Initial slope of the P-I curve (mol C gChl-1 (W m-2)-1 d-1). 
+! 1 W m-2 = 4.6 uE m-2 s-1. 
+! Ward et al. (L&O) used the size independent slope of 3.83E-7 mol C (gChl-1) (uE m-2)-1. 
+! Edwards et al. L&O (2015) estimated a size dependent value of 10**(-1.36) d-1 (uE m-2 s-1)-1 (= 5.05E-7 (uE m-2)-1)
+! So I choose a value of 10**(-1.36)*4.6/(50/12)= 0.05 
+       alphaI     = -0.13  ! From Edwards et al. L&O 2015
+       A0star     = 40.0   ! From Pahlow et al. MEPS 2013
+       alphaA     = -0.3
+       V0star     = 4.0
+       alphaV     = 0.0
+       K0star     = 0.17   !Normalization constant for half-saturation constant for nitrate (mmolN m-3), from Litchman et al. 2007
+       alphaK     = 0.27  ! Litchman et al. 2007
+       alphaG     = 1.1
+       Q0star     = 0.07  ! Litchman et al. 2007; Ward et al. L&O 2012 
+       alphaQ     = -0.17 ! Litchman et al. 2007; Ward et al. L&O 2012 
+!       fV_initial = 0.25
+       w31_p      = 0.1   !Stoke's law: V = 2/9*(rho_p - rho_f)*g*R**2/mu (mu: dynamic viscosity, which is function
+                          !of temperature.) w_p0 = w(31)*(0.451 + 0.0178*T) (Gregg et al. 2008). 
+                          !We also set this to be size dependent
+                          !such that w_p = w_p0* Wstar * exp(logsize * alphaW)
+       w31_d      = 1.0
+       alphaW     = 0.39  ! Laws 1975
+       kc         = 0.025
+       gmax       = 3.0
+
+!      open(10,file='input.nml',status='unknown',iostat=error)
+!      
+!      if (error /= 0) then
+!        write(stdout,*) 'open input.nml fails'
+!        stop
+!      else
+!        read(10,nml=param_nml,IOSTAT=Reason)
+!        if (Reason > 0) then
+!          write(stdout,*) 'Check input, something is wrong!'
+!          stop
+!        elseif (Reason < 0) then
+!          write(stdout,*) 'End of file reached!'
+!          stop
+!        else
+!          continue
+!        endif
+!      endif 
+!      close(unit=10) !Must add. Otherwise it will not read the file from the beginning!
+       
+      self%mu0star    = mu0star*self%dtdays
+      self%alphamu    = 0.19
+      self%aIstar     = aIstar*self%dtdays
+      self%alphaI     = alphaI
+      self%A0star     = A0star*self%dtdays       
+      self%alphaA     = alphaA
+      self%V0star     = V0star*self%dtdays
+      self%alphaV     = alphaV
+      self%K0star     = K0star 
+      self%alphaK     = alphaK 
+      self%alphaG     = alphaG
+      self%Q0star     = Q0star
+      self%alphaQ     = alphaQ
+      self%fV_initial = 0.25 !Initial value for the fraction of energy devoted to nutrient uptake
+      self%w_p  = w31_p*self%dtdays*(0.451+0.0178*self%tC) !Temperature dependent sinking rate of phytoplankton, POSITIVE!!
+      self%w_d  = w31_d*self%dtdays*(0.451+0.0178*self%tC)!Sinking rate of detritus
+      self%kc   = kc!Light attenuation of chlorophyll (mg Chl m-2)
+      self%gmax = 3.0*self%dtdays !Maximal biomass-specific ingestion rate of zooplankton at 15 ºC
+      self%kp   = 0.2  !half-saturation constant for zooplankton grazing
+      self%rdn  = 0.03*self%dtdays!The conversion rate from detritus to nutrient at reference temperature
+      self%rpdu = 0.1*self%dtdays!Phytoplankton mortality rate at reference temperature in the euphotic zone
+      self%rpdl = 0.02*self%dtdays!Phytoplankton mortality rate at reference temperature below the euphotic zone 
+      self%Ea        = 0.6           !Activation energy (eV)
+      self%mz        = 0.025*self%dtdays    !Coefficient for zooplankton mortality at 15 C
+      self%zetaN     = 0.6       !Cost of DIN uptake (mol C/mol N)   
+      self%RMchl     = 0.1 *self%dtdays      !Cost of chl maintenance (d-1) 
+      self%zetaChl   = 0.6       !Cost of photosynthesis coefficient (mol C/g Chl)
+      self%fV_opt    = .true.       !logic variable indicating whether the model should be optimality-based
+      self%nutrient_uptake=2      !The model used for nutrient uptake
+      self%grazing_formulation=3
+      self%Tr        = 15       !Reference temperature (ºC)
+      self%CF_opt    = .true.
+      self%beta      = 0.2      !Assimilation coefficient 
+      self%Ca        = 0.3       !Cost of assimilation coefficient
+      self%Cf        = 0.3       !Effective cost of foraging coefficient  
+      self%Emax      = 0.99      !Maximal assimilation efficiency
+      self%RMzoo     = 0.16*self%dtdays     !Specific maintenance respiration (d-1)
+
+
+      end subroutine initialize
+   
+!---------------------------------------------------------
+      function temp(self) result(tf)
+!IROUTINE: Temperature dependence of plankton rates. Added by Bingzhang Chen on 20150213
+!DESCRIPTION:
+!The temperature dependence of plankton rates are fomulated according to the Arrhenuis equation. 
+! tC: in situ temperature
+! Tr: reference temperature
+!
+!INPUT PARAMETERS:
+        class (type_PZEFT), intent(in), target :: self
+        real  :: tf
+        real, parameter:: kb = 8.62E-5 ! boltzman constant constant [ eV /K ]
+     &                    Tr = 15.
+        
+       tf=exp(-(self%Ea/kb)*(1.0/(273.15+self%tC)-1.0/(273.15 + Tr)))
+     
+       end function temp
+!EOC
+ 
+!-----------------------------------------------------------------------
+! !IROUTINE:Computing phytoplankton growth components  
+!
+! !INTERFACE:
+      subroutine growth(self)
+      use lambert
+!INPUT PARAMETERS:
+      class (type_PZEFT),intent(inout) :: self
+!LOCAL VARIABLES:
+      real :: I_zero, tf 
+      real :: V0hat,Kn,Lmin,A0hat,dA0hatdl,d2A0hatdl2,fA
+      real :: VNhat,dVNhatdl,d2VNhatdl2 ! Nutrient uptake variables
+      real :: mu0hat,muIhat,mu0hatSI,dmu0hatSIdl,d2mu0hatSIdl2
+      real :: dmuIhatdl,d2muIhatdl2! Growth rate variables
+      real :: fV,dfVdl,d2fVdl2  !fV
+      real :: ZINT,dZINdl,d2ZINdl2 !ZINT
+      real :: aI,SI,dSIdl         !Light dependent component
+      real :: RMchl,Theta,ThetaHat,dThetaHatdl,d2ThetaHatdl2 !Chl related variables
+      real :: Qopt,Qs,dQoptdl,d2Qoptdl2  ! cell quota related variables
+      real :: larg,w_p
+      real, parameter :: errr = 1E-10, Penfac=3.0,pi=3.1415926535
+      integer, parameter :: stdout=6
+   
+!-----------------------------------------------------------------------
+! Phytoplankton codes below mostly come from S. Lan Smith
+! calculate the trait values at the mean size, lmean 
+! multiplying RATES only by tC (Temperature dependence)
+
+! Only for pot. max. affinity, apply a penalty function (to avoid unrealistic increase at v. small cell size). 
+! To get the max. affinity at ESD = 0.2 micrometers: 
+! The maximal growth rate (mu0hat) under temperature tC 
+
+      tf     = self%tf()
+     
+      mu0hat = ScaleTrait(self%PMU, tf*self%mu0star, self%alphamu)
+      V0hat  = ScaleTrait(self%PMU, tf*self%V0star,  self%alphaV )
+      aI     = ScaleTrait(self%PMU, self%aIstar,  self%alphaI)   ! Initial slope of P-I curve
+      Qs     = ScaleTrait(self%PMU, self%Q0star,  self%alphaQ)/2.
+      RMChl  = tf*self%RMChl
+   
+      ! Threshold irradiance and RMchl is set temperature dependent
+      I_zero = self%zetaChl*RMchl/aI  
+      ! Calculate thetahat (optimal g Chl/mol C for the chloroplast under nutrient replete conditions)
+       IF( self%fV_opt .EQ. .true. ) THEN 
+            if( self%par .gt. I_zero ) then
+             larg = (1.0 + RMchl/mu0hat) 
+     &  * exp(1.0 + aI*self%par/(mu0hat*self%zetaChl))      
+!       write(stdout,*) 'mu0hat = ', mu0hat
+!       write(stdout,*) 'larg= ',larg, 'WAPR = ', WAPR(larg,0,0)  
+!       WAPR(larg,0,0) > 1!  ThetaHat decreases with increasing aI.
+       ThetaHat = 1.0/self%zetaChl + ( 1.0-WAPR(larg,0,0) )
+     &  *  mu0hat/(aI*self%par)
+
+! First derivative of ThetaHat
+       dThetaHatdl = (self%alphamu - self%alphaI)
+     &  *         (ThetaHat - (1/self%zetaChl)/(1 + WAPR(larg,0,0)))    
+     &  +        self%alphamu*( WAPR(larg,0,0)/(1 + WAPR(larg,0,0)))   
+     &  *         (mu0hat/(aI*self%par))*RMchl/(mu0hat + RMchl)   
+! Second derivative of ThetaHat 
+         d2ThetaHatdl2 = (self%alphamu-self%alphaI) * dThetaHatdl
+     &  -          ( (aI*self%par/mu0hat)                               
+     &  *            ( (self%alphaI-self%alphamu) /self%zetaChl)**2 )   
+     &  *             WAPR(larg,0,0)/(1.+WAPR(larg,0,0))**3
+     &  -             2.*self%alphamu
+     &  *            ( (self%alphaI-self%alphamu)/self%zetaChl)       
+     &  *            ( RMchl/(RMchl + mu0hat) )                     
+     &  *            ( mu0hat/(aI*self%par) )
+     &  *              WAPR(larg, 0, 0)/(1 + WAPR(larg, 0, 0))**3
+     &  +              self%alphamu                            
+     &  *            ( (self%alphamu - self%alphaI))
+     &  -               self%alphamu
+     &  *            ( mu0hat/(RMchl + mu0hat) )  
+     &  *            (  RMchl/(RMchl + mu0hat) )
+     &  *            ( mu0hat / (aI*self%par) )  
+     &  *            WAPR(larg,0,0)/(1.+WAPR(larg, 0, 0))    
+            else
+               ThetaHat= 0.01  !  a small positive value 
+               dThetaHatdl=0.
+               d2ThetaHatdl2=0.
+            endif
+         ELSE
+            ThetaHat = 0.6
+            dThetaHatdl=0.
+            d2ThetaHatdl2=0.
+
+         ENDIF
+
+        !The light limitation index (SI)
+        SI = 1.-exp(-aI*self%par*ThetaHat/mu0hat)
+        dSIdl = ( (self%alphaI-self%alphamu)*ThetaHat + dThetaHatdl)
+     &      *(1. - SI)*aI*self%par / mu0hat    !confirmed
+   
+      ! Light dependent growth rate 
+      ! (needs to take into account the cost of dark and light-dependent chl maintenance)
+      mu0hatSI = mu0hat*SI  ! Gross specific carbon uptake (photosynthesis)
+      muIhat= max((mu0hatSI-(mu0hatSI+RMchl)*self%zetaChl*ThetaHat),
+     &            errr) ! Net specific carbon uptake
+      dmu0hatSIdl = self%alphamu*mu0hatSI        
+     &      +      aI*self%par*(1.0 - SI)       
+     &      *      ((self%alphaI - self%alphamu)*ThetaHat        
+     &      +     dThetaHatdl)
+
+         d2mu0hatSIdl2 = self%alphamu*dmu0hatSIdl 
+     & + self%par*((self%alphaI-self%alphamu)
+     & * (aI*(1.-SI)*dThetaHatdl-aI*ThetaHat*dSIdl
+     & + (1.-SI)*ThetaHat*self%alphaI*aI)
+     & + (d2ThetaHatdl2*aI*(1.-SI)
+     & - aI*dThetaHatdl*dSIdl
+     & + (1.-SI)*dThetaHatdl*self%alphaI*aI)) !Confirmed
+
+       dmuIhatdl = (1.-self%zetaChl*ThetaHat)
+     & * dmu0hatSIdl  
+     & - dThetaHatdl*self%zetaChl*(mu0hatSI+RMchl) 
+   
+       d2muIhatdl2=d2mu0hatSIdl2-self%zetaChl 
+     &  *(ThetaHat*d2mu0hatSIdl2+2.*dThetaHatdl*dmu0hatSIdl
+     &  +mu0hatSI*d2ThetaHatdl2)
+     &  -self%zetaChl*RMchl*d2ThetaHatdl2
+    
+      ! Define vNhat: the saturation function of ambient nutrient concentration
+      select case(self%nutrient_uptake)  
+      ! case 1: Classic Michaelis Menton 
+        case(1)
+      ! Potential maximal nutrient-limited uptake
+   
+          Kn = ScaleTrait(self%PMU,self%K0star, self%alphaK )  ! Half-saturation constant of nitrate uptake
+          VNhat = max(V0hat*self%NO3/(self%NO3 + Kn), errr) !To force positivity       
+       dVNhatdl = -VNhat*self%alphaK*Kn/(self%NO3+Kn)+self%alphaV*VNhat
+          d2VNhatdl2 = -self%alphaK*(Kn/(self%NO3+Kn)*dVNhatdl    
+     &   - Kn*VNhat*self%alphaK*self%NO3/(self%NO3+self%alphaK)**2)
+     &   + self%alphaV*dVNhatdl
+      ! case 2: optimal uptake based on Pahlow (2005) and Smith et al. (2009)
+        case(2)
+          Lmin = log(0.2**3/6*pi) + log(1+Penfac)/( Penfac*self%alphaA) 
+          A0hat  = PenAff(self%PMU, self%alphaA, Penfac, Lmin )
+     &        * ScaleTrait(self%PMU, tf*self%A0star, self%alphaA)
+       dA0hatdl = self%alphaA*A0hat 
+     &        - self%A0star*exp(self%PMU*self%alphaA)*Penfac*self%alphaA
+     &        * exp(Penfac*self%alphaA*(self%PMU-Lmin))
+       d2A0hatdl2 = self%alphaA*dA0hatdl 
+     &        - Penfac*self%alphaA*exp(self%alphaA*((1.+Penfac)*self%PMU
+     &        - Penfac*Lmin)) 
+     &        * (dA0hatdl + A0hat*self%alphaA*(1.+Penfac))  
+   
+          !Define fA
+          fA = 1.0/( 1.0 + sqrt(A0hat * self%NO3/V0hat) ) 
+       VNhat = (1.0-fA)*V0hat*fA*A0hat*self%NO3/
+     &        ((1.0-fA)*V0hat + fA*A0hat*self%NO3) 
+   
+      dVNhatdl= self%alphaV*VNhat
+     &   - VNhat**2/self%NO3/A0hat*(1.+sqrt(self%NO3*A0hat/V0hat))
+     &   * (self%alphaV-dA0hatdl/A0hat)  !Should be OK
+        
+        d2VNhatdl2 = self%alphaV*dVNhatdl-
+     &   (VNhat**2/self%NO3/A0hat*(1.+sqrt(self%NO3*A0hat/V0hat))
+     &   * (dA0hatdl**2/A0hat**2-d2A0hatdl2/A0hat) 
+     &   + VNhat**2/self%NO3/A0hat*(self%alphaV-dA0hatdl/A0hat)
+     &   * 0.5*sqrt(self%NO3/A0hat/V0hat)*(dA0hatdl-A0hat*self%alphaV) 
+     &   + (1.+sqrt(self%NO3*A0hat/V0hat))*(self%alphaV-dA0hatdl/A0hat)
+     &   * VNhat**2/self%NO3/A0hat*(2.*self%alphaV-dA0hatdl/A0hat))  !Should be OK
+      end select  
+      
+      ! Define optimal fV
+       IF( self%fV_opt .EQ. .TRUE. ) THEN
+           ! Define ZINT
+           ZINT = Qs*(muIhat/vNhat+self%zetaN)
+           Qopt = (1.0 + sqrt(1.0 + 1.0/ZINT))*Qs
+         dZINdl = Qs*(dmuIhatdl/VNhat - muIhat*dVNhatdl/VNhat**2)
+     &           +  self%alphaQ*ZINT    
+   
+       dQoptdl=self%alphaQ*Qopt-dZINdl*Qs/(2.*ZINT*sqrt(ZINT*(1.+ZINT))) !confirmed  
+   
+        d2ZINdl2  = Qs/VNhat*((self%alphaQ-dVNhatdl/VNhat)*dmuIhatdl 
+     &  + d2muIhatdl2)
+     &  - Qs/VNhat**2*(muIhat*d2VNhatdl2 
+     &  + dVNhatdl*(dmuIhatdl+self%alphaQ*muIhat-2.*muIhat
+     &  / VNhat*dVNhatdl)) 
+     &  + self%alphaQ*dZINdl
+     
+        d2Qoptdl2 =  self%alphaQ*dQoptdl
+     & -  Qs/(2.*ZINT*sqrt(ZINT*(ZINT+1.)))
+     & *  (d2ZINdl2+self%alphaQ*dZINdl     
+     & -  (2.*ZINT+1.5)/(ZINT*(ZINT+1.))*dZINdl**2)      ! Confirmed
+    
+         if (self%par .gt. I_zero) then   
+            fV = (-1.0 + sqrt(1.0 + 1.0/ZINT))*Qs*muIhat/vNhat
+!
+         dfVdl = self%alphaQ*Qs*(1/Qopt + 2*self%zetaN)   
+     &             -  (self%zetaN + Qs/Qopt**2) * dQoptdl  !Confirmed
+!
+           d2fVdl2 = (self%alphaQ**2)*Qs*(1/Qopt + 2*self%zetaN ) 
+     &      -    2.*self%alphaQ*Qs* dQoptdl/Qopt**2    
+     &      +    2.*(dQoptdl**2)*Qs/Qopt**3           
+     &      -   (self%zetaN + Qs/Qopt**2.) * d2Qoptdl2  ! Confirmed
+! 
+           else 
+            fV = 0.01
+          dfVdl= 0.
+         d2fVdl2 = 0.
+         end if
+   
+         ELSE
+           fV   = self%fV_initial 
+           Qopt = 16.0/106.0 
+           dfVdl= 0.
+          d2fVdl2=0.
+          dQoptdl=0.
+          d2Qoptdl2=0.
+       ENDIF
+! Net growth rate (d-1) of phytoplankton at the average size as a function of temperature, light, and nutrient   
+      self%muNet = max(muIhat*(1.0-fV-Qs/Qopt)
+     &     - self%zetaN*fV*vNhat,0.0)
+! Here the derivative of muNet includes respiratory costs of both N Assim and Chl maintenance       
+        self%dmuNetdl = muIhat*(Qs/(Qopt**2)*dQoptdl
+     & -          self%alphaQ*Qs/Qopt-dfVdl)  
+     & +          (1.-fV-Qs/Qopt)*dmuIhatdl 
+     & -          self%zetaN*(fV*dVNhatdl+VNhat*dfVdl)
+
+         self%d2muNetdl2 = Qs/(Qopt**2)*dQoptdl*dmuIhatdl
+     &  + muIhat*dQoptdl*(self%alphaQ*Qs/(Qopt**2)
+     &  - 2.*Qs/(Qopt**3)*dQoptdl)
+     &  + muIhat*Qs/(Qopt**2)*d2Qoptdl2   
+     &  - (self%alphaQ*(Qs/Qopt*(dmuIhatdl+self%alphaQ*muIhat) 
+     &  - muIhat*Qs/(Qopt**2)*dQoptdl))  
+     &  - (muIhat*d2fVdl2+dfVdl*dmuIhatdl)  
+     &  + dmuIhatdl*(Qs/(Qopt**2)*dQoptdl-self%alphaQ*Qs/Qopt-dfVdl) 
+     &  + (1.-fV-Qs/Qopt)*d2muIhatdl2     
+     &  - self%zetaN*(fV*d2VNhatdl2+2.*dfVdl*dVNhatdl+VNhat*d2fVdl2)  !dC
+
+!  chl:C ratio [ g chl / mol C ] of the whole cell, at the mean cell size 
+          Theta = ThetaHat*(1.0 - fV - Qs/Qopt)
+          self%fV    = fV
+          self%Theta = Theta
+! Calculate the mean chl:C ratio of phytoplankton (averaged over all sizes) 
+! using the second derivative of the cell quota w.r.t. log size. (Why negative?)
+            self%ThetaAvg = Theta + (self%VAR/2.)          
+     &    *  ( d2ThetaHatdl2*(1.0 - fV - Qs/Qopt)         
+     &    -      ThetaHat   *(d2fVdl2 + Qs*((dQoptdl**2)*(2./Qopt)
+     &    - d2Qoptdl2)/(Qopt**2)))
+   
+! Calculate the mean N:C ratio of phytoplankton (averaged over all sizes) 
+! using the second derivative of the cell quota w.r.t. log size. (How to derive?)
+       self%QNavg = Qopt/(1.+((2/Qopt)*dQoptdl**2 - d2Qoptdl2)
+     &    * self%VAR/(2*Qopt))  
+          
+! Total Chl a (unit: mg Chl m-3)
+          self%CHL = self%PHY/self%QNavg*max(self%ThetaAvg,self%Theta)
+
+! Calculate the community sinking rate of phytoplankton
+      ! Phytoplankton sinking rate at the average size
+      w_p = ScaleTrait(self%PMU,self%w_p,self%alphaW)
+      d2wpdl2 = self%alphaW**2*w_p
+      self%w_pAvg = w_p+0.5*self%VAR*d2wpdl2
+
+      end subroutine growth
+!-----------------------------------------------------------------------
+   
+!---------------------------------------------------------
+! The -1 branch of the Lambert-W function
+        pure real FUNCTION w1(x)
+         IMPLICIT NONE
+         REAL, PARAMETER  :: m1=0.3361, m2=-0.0042, m3=-0.0201
+         REAL, INTENT(IN) :: x
+         REAL :: s
+         s  = -1.0 - LOG(-x)
+         w1 = -1.0 - s - 2.0/m1*(1.0 - 1.0/(1.0 + (m1*SQRT(0.5*s)
+     &                         /(1.0 + m2*s*EXP(m3*SQRT(s))))))
+      END FUNCTION w1
+!
+!-----------------------------------------------------------------------
+! Adopted from the model of Lan. Smith
+        pure real function ScaleTrait( logsize, star, alpha) 
+            implicit none
+            real, intent(IN) :: logsize, star, alpha
+         
+            ! Calculate the size-scaled value of a trait
+            ! for the given log (natural, base e) of cell volume as pi/6*ESD**3 (micrometers). 
+         
+            ScaleTrait = star * exp( alpha * logsize )
+         
+            return
+         end function ScaleTrait
+!-----------------------------------------------------------------------    
+        real function PenAff( logsize, alpha, Pfac, lmin ) 
+            implicit none
+            real, intent(IN) :: logsize, alpha, Pfac, lmin 
+        
+            ! A 'penalty' function to reduce the value of affinity for nutrient at very small cell sizes
+            ! in order to avoid modeling unrealistically small cell sizes.  This is needed because affnity
+            ! increases with decreasing cell size, which means that under low-nutrient conditions, without
+            ! such a penalty, unrealistically small cell sizes could be predicted.
+            ! This penalty function becomes zero at logsize = lmin.   
+         
+            PenAff = 1.0 - exp(Pfac*alpha*(logsize - lmin))
+        
+            return
+        end function PenAff
+!-------------------------------------------------------------------
+        subroutine OCF(self)
+! Calculate the feeding probability Q(Pt) based on the optimal feeding current model 
+! (Pahlow MEPS 2010)
+! The total amount of phytoplankton grazed by zooplankton (molN m-3)
+! This does not depend on size classes and the parameter 'alphaG'
+! that determines prey switching
+
+! This subroutine calculates the ingestion, respiration, egestion, and net growth rate
+! of zooplankton given the total amount of prey available 
+          use lambert
+          implicit none
+          class (type_PZEFT), intent(inout), target :: self
+          ! Declare local variables
+          real :: tf,ghat,g_th,aAt,aAf,AE 
+ 
+          tf=self%tf()
+        ! Calculate the feeding probability function based on self%PHY
+        ! kp relates to the capture coefficient
+          SELECT CASE(self%grazing_formulation)
+            ! Holling Type I
+            case (1)
+            ghat = min(self%PHY/2.0/self%kp,1.0)
+            ! Holling Type II
+            case (2)
+            ghat = self%PHY/(self%kp + self%PHY)  
+            ! Holling Type III
+            case (3) 
+            ghat = self%PHY**2.0/(self%kp**2.0 + self%PHY**2.0)
+            ! Ivlev
+            case (4)
+            ghat = 1.0 - exp(-LOG(2.0)*self%PHY/self%kp)  
+          END SELECT
+        ! Calculate feeding threshold of ghat (dimensionless)
+          g_th = self%Cf/self%Emax/(1.0 - self%Ca)  
+   
+        ! Calculate total foraging activity (d-1)
+          aAt = tf*self%gmax/self%beta*      
+     &      (-1.0 - w1(-(1.0-g_th)/EXP(1.0+self%beta)))
+   
+        ! Compute the optimal foraging activity to maximize net growth of zooplankton
+          IF (ghat .GT. g_th) THEN
+            if (self%CF_opt .eq. .true.) then
+           ! Optimal foraging, aAf: Specific foraging activity (d-1) = 1/h (h: biomass specific handling time)
+           !With increasing food conc., optimal aAf slightly increases with food conc.
+              aAf = aAt*self%beta/(-1.0 - w1(-(1.0-g_th/ghat) 
+     &         /EXP(1.0 + self%beta)))
+              ! Control model
+              else
+              aAf = aAt * 0.3
+            endif 
+         ! Assimilation efficiency relates with two factors
+         ! 1) The difference between total activity (aAt) and foraging activity (aAf)
+         ! 2) Gut passage time
+         ! AE is negatively related with foraging activity
+         ! because digestion enzymes decrease with increasing food
+         ! Another factor, gut passange time linearly increases with handling time
+            AE  = self%Emax*(1.0 - exp(-self%beta*(aAt/aAf - 1.0)))  
+             
+            ELSE
+   
+            aAf = 0.0
+            AE  = self%Emax
+          ENDIF
+        
+          ! Ingestion rate of zooplankton 
+          self%INGES = aAf * ghat
+          
+          ! Zooplankton respiration (-> Nut)
+          self%RES = self%RMzoo*tf+self%Ca*AE*self%INGES
+     & +             self%Cf*aAf    
+   
+          ! Zooplankton net growth (To force it positive)
+          self%NGR = max(AE*self%INGES - self%RES,0.)
+   
+          ! ZOOPLANKTON EGESTION (-> Detritus)
+          self%EGES = max(self%INGES - self%NGR - self%RES,0.0)
+
+          ! Grazing rate on the mean size (specific to N-based Phy biomass, unit: d-1) (Eq. 17)
+          self%gbar = self%INGES*self%ZOO/self%PHY*sqrt(self%alphaG)
+         
+          self%dgdlbar = 0.  ! for all cases (when evaluated at the mean size; Eq. B-3)
+          
+          ! arbitrary max. for now 
+          self%d2gdl2bar = -(self%alphaG-1.)*self%gbar/self%VAR  ! Eq. B-6   
+!      endif 
+      end subroutine OCF
+!--------------------------------------------------------------------------------------
+      subroutine ODE(self)
+       implicit none
+       class(type_PZEFT),intent(inout),target :: self
+       real I_min,rpd,tf
+       integer, parameter :: stdout=6,numc=4
+       integer :: i,j
+       real, parameter :: errr=1E-3
+       real :: PP_nz,PP_nd,PP_dp,PP_dz,PP_pn,PP_zp
+
+      tf = self%tf()
+      ! Define I_min as 1% of I_0 (bottom of euphotic layer)
+      I_min = 0.01*self%I_0
+   
+      ! Loss rate of phytoplankton to detritus depends on local light intensity.
+      if (self%par .ge. I_min) then
+         rpd = tf*self%rpdu
+      else
+         rpd = tf*self%rpdl
+      endif
+
+      self%dPMUdt = self%VAR*(self%dmuNetdl - self%dgdlbar)
+      self%dVARdt = self%VAR**2*(self%d2muNetdl2 - self%d2gdl2bar)  !Eq. 19 
+   
+      self%dPHYdt = 0.5*self%PHY*(2.*(self%muNet - rpd) 
+     &  + self%VAR*self%d2muNetdl2)
+     &  - self%ZOO*self%INGES  ! The total amount of phytoplankton grazed by zoo is independent of average size    
+
+          ! Nutrient changes (Eq. 23)
+      self%dNO3dt = self%RES*self%ZOO + self%rdn*self%DET*tf
+     &  - self%PHY*(self%muNet + 0.5*self%VAR*self%d2muNetdl2)
+
+! dz = zooplankton growth(excluding excretion and egestion) - zooplankton mortality (molN d-1)
+      self%dZOOdt = self%ZOO*self%NGR - self%ZOO**2.*self%mz*tf
+! dD = phytoplankton mortality + zooplankton mortality + zooplankton egestion - conversion-to-nutrient (molN d-1)
+      self%dDETdt = -(self%dNO3dt+self%dPHYdt+self%dZOOdt)   
+      
+      PP_nz = self%RES*self%ZOO
+      PP_nd = self%rdn*self%DET*tf
+      PP_dp = self%PHY*rpd
+      PP_dz = self%ZOO**2.*self%mz*tf+self%ZOO*self%EGES
+      PP_pn = self%PHY*(self%muNet + 0.5*self%VAR*self%d2muNetdl2)
+      PP_zp = self%ZOO*self%INGES
+
+! Write out production/destruction matrix
+      ! 1: NO3; 2: PHY; 3: ZOO; 4: DET
+      self%pp      = 0.
+      self%dd      = 0.
+      self%pp(1,3) = PP_nz
+      self%pp(1,4) = PP_nd
+      self%pp(2,1) = PP_pn
+      self%pp(3,2) = PP_zp
+      self%pp(4,2) = PP_dp
+      self%pp(4,3) = PP_dz
+      
+      do i = 1,numc
+        do j = 1,numc
+          self%dd(j,i)=self%pp(i,j) 
+        end do
+      end do 
+
+      end subroutine ODE
+!--------------------------------------------------------------------------------------
+
+!--------------------------------------------------------------------------------------------
+      subroutine modified_patankar_2(self)
+!
+! !DESCRIPTION:
+! Here, the second-order Modified Patankar-Runge-Kutta (MPRK2) scheme is coded,
+! with two evaluations of the right hand sides per time step:  (Burchard et al. 2003)
+!
+! \begin{equation}\label{eq:am:MPRK}
+!   \left. \begin{array}{rcl}
+!     c_i^{(1)} &=&
+! \displaystyle
+! c_i^n  + \Delta t
+! \left\{
+! \sum\limits_{\stackrel{j=1}{j \not= i}}^I p_{i,j}\left(\underline{c}^n\right)
+! \dfrac{c_j^{(1)}}{c_j^n}
+! + p_{i,i}\left(\underline{c}^n\right)
+! - \sum_{j=1}^I d_{i,j}\left(\underline{c}^n\right)
+! \dfrac{c_i^{(1)}}{c_i^n}
+! \right\},
+! \\ \\
+! c_i^{n+1} &=&
+! \displaystyle
+! c_i^n  + \dfrac{\Delta t}{2}
+!                   \left\{
+!                     \sum\limits_{\stackrel{j=1}{j \not= i}}^I
+!                       \left(p_{i,j}\left(\underline{c}^n\right)
+!                           + p_{i,j}\left(\underline{c}^{(1)}\right)
+!                       \right) \dfrac{c_j^{n+1}}{c_j^{(1)}}
+!                       + p_{i,i}\left(\underline{c}^n\right)
+!                       + p_{i,i}\left(\underline{c}^{(1)}\right)
+! \right.\\ \\
+!               & &
+! \displaystyle
+! \left.\phantom{c_i^n  + \dfrac{\Delta t}{2} }
+!                   - \sum_{j=1}^I
+!                       \left(d_{i,j}\left(\underline{c}^n\right)
+!                           + d_{i,j}\left(\underline{c}^{(1)}\right)
+!                       \right) \dfrac{c_i^{n+1}}{c_i^{(1)}}
+!                   \right\}.
+!   \end{array}
+!   \right\}
+! \end{equation}
+!
+! !USES:
+        IMPLICIT NONE
+!
+! !INPUT PARAMETERS:
+       integer, parameter  :: numc=4,stdout=6
+       class(type_PZEFT),intent(inout),target :: self
+!
+! !INPUT/OUTPUT PARAMETER:
+        REAL :: cc(1:numc)
+     
+!        interface
+!           subroutine right_hand_side(first,numc,cc,pp,dd)
+!              logical, intent(in)      :: first
+!              integer, intent(in)      :: numc
+!              REALTYPE, intent(in)     :: cc(1:numc)
+!              REALTYPE, intent(out)    :: pp(1:numc,1:numc)
+!              REALTYPE, intent(out)    :: dd(1:numc,1:numc)
+!           end subroutine
+!        end interface
+!
+! !REVISION HISTORY:
+!  Original author(s): Hans Burchard, Karsten Bolding
+!
+! !LOCAL VARIABLES:
+       REAL :: pp2(1:numc,1:numc),dd2(1:numc,1:numc)
+       REAL :: pp1(1:numc,1:numc),dd1(1:numc,1:numc)
+       REAL :: a(1:numc,1:numc),r(1:numc)
+       REAL :: cc1(1:numc)
+       REAL, parameter :: eps = 1.E-4
+       integer  :: i,j
+!EOP
+!-----------------------------------------------------------------------
+!BOC
+! Filter out NaN and nonpositive values and restore them to a small positive number!
+      if (self%PMU /= self%PMU .or. 
+     &    self%VAR /= self%VAR .or.
+     &    self%NO3 /= self%NO3 .or.
+     &    self%PHY /= self%PHY .or.
+     &    self%ZOO /= self%ZOO .or.
+     &    self%DET /= self%DET .or.
+     &    self%NO3 <= 0.       .or.
+     &    self%PHY <= 0.       .or.
+     &    self%ZOO <= 0.       .or.
+     &    self%DET <= 0.           ) then
+         self%NO3 = eps
+         self%PHY = eps
+         self%ZOO = eps
+         self%DET = eps
+         self%PMU = eps
+         self%VAR = eps
+
+      else  
+ 
+        cc(1)=self%NO3
+        cc(2)=self%PHY
+        cc(3)=self%ZOO
+        cc(4)=self%DET
+
+!  absolutely essential since not all elements are calculated
+        pp2=0. ; pp1=0.
+        dd2=0. ; dd1=0.
+     
+        call self%initialize
+        call self%growth
+        call self%OCF
+        call self%ODE
+      
+        pp1=self%pp
+        dd1=self%dd
+     
+      do i=1,numc
+         a(i,i)=0.
+         do j=1,numc
+            a(i,i)=a(i,i)+dd1(i,j)
+!            if (i.ne.j) a(i,j)=-self%dtdays*pp1(i,j)/cc(j)
+            if (i.ne.j) a(i,j)=-pp1(i,j)/cc(j)
+         end do
+!         a(i,i)=self%dtdays*a(i,i)/cc(i)
+         a(i,i)=a(i,i)/cc(i)
+         a(i,i)=1.+a(i,i)
+!         r(i)  =cc(i)+self%dtdays*pp1(i,i)
+         r(i)  =cc(i)+pp1(i,i)
+      end do
+      call matrix(numc,a,r,cc1(:))
+      
+      self%NO3=cc1(1)
+      self%PHY=cc1(2)
+      self%ZOO=cc1(3)
+      self%DET=cc1(4) 
+
+        call self%initialize
+        call self%growth
+        call self%OCF
+        call self%ODE
+     
+      pp2=0.5*(self%pp+pp1)
+      dd2=0.5*(self%dd+dd1)
+     
+      do i=1,numc
+         a(i,i)=0.
+         do j=1,numc
+            a(i,i)=a(i,i)+dd2(i,j)
+!            if (i.ne.j) a(i,j)=-self%dtdays*pp2(i,j)/cc1(j)
+            if (i.ne.j) a(i,j)=-pp2(i,j)/cc1(j)
+         end do
+!         a(i,i)=self%dtdays*a(i,i)/cc1(i)
+         a(i,i)=a(i,i)/cc1(i)
+         a(i,i)=1.+a(i,i)
+!         r(i)  =cc(i)+self%dtdays*pp2(i,i)
+         r(i)  =cc(i)+pp2(i,i)
+      end do
+      call matrix(numc,a,r,cc(:))
+     
+      self%NO3=cc(1)
+      self%PHY=cc(2)
+      self%ZOO=cc(3)
+      self%DET=cc(4) 
+      endif
+      return
+      end subroutine modified_patankar_2
+!-----------------------------------------------------------------------
+!BOP
+!
+! !IROUTINE: Matrix solver
+!
+! !INTERFACE:
+        subroutine matrix(n,a,r,c)
+!
+! !DESCRIPTION:
+! This is a Gaussian solver for multi-dimensional linear equations.
+!
+! !USES:
+        IMPLICIT NONE
+!
+! !INPUT PARAMETERS:
+        integer, intent(in)                 :: n
+!
+! INPUT/OUTPUT PARAMETERS:
+       REAL                             :: a(1:n,1:n),r(1:n)
+!
+! OUTPUT PARAMETERS:
+       REAL, intent(out)                :: c(1:n)
+!
+! !REVISION HISTORY:
+!  Original author(s): Hans Burchard, Karsten Bolding
+!
+! !LOCAL VARIABLES:
+       integer  :: i,j,k
+!EOP
+!-----------------------------------------------------------------------
+!BOC
+        do i=1,n
+           r(i)=r(i)/a(i,i)
+           do j=n,i,-1
+              a(i,j)=a(i,j)/a(i,i)
+           end do
+           do k=i+1,n
+              r(k)=r(k)-a(k,i)*r(i)
+              do j=i+1,n
+                 a(k,j)=a(k,j)-a(k,i)*a(i,j)
+              end do
+           end do
+        end do
+     
+        do i=n,1,-1
+           c(i)=r(i)
+           do j=i+1,n
+              c(i)=c(i)-a(i,j)*c(j)
+           end do
+        end do
+     
+        return
+        end subroutine matrix
+!--------------------------------------------------------------------------------------
+      END MODULE PZEFT
