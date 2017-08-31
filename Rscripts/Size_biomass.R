@@ -212,3 +212,32 @@ dev.off()
             xaxt = 'n',frame = F,
             xlab = "", ylab = "Latitude (ºN)")
 
+#Compare biomass fraction and Chl fraction in Hong Kong waters:
+setwd('~/Working/RGC-monthly/')
+file <- 'spectra.csv'
+dat  <- read.csv(file)
+dat$micChl_frac <- dat$microChl/dat$Chla
+dat$micB_frac   <- dat$microB/dat$Btot
+
+pdf('Micro_Btot.pdf',width=4,height=6,paper='a4')
+op <- par(font.lab  = 1,
+             family ="serif",
+             mar    = c(4,4,1.5,3),
+             mgp    = c(2.3,1,0),
+             oma    = c(4,4,0,0),
+             mfcol  = c(2,1), cex=.8, 
+             cex.lab=1.2,cex.axis=1.2 ) 
+
+x = dat[dat$Stn == 'PM7',]
+y = dat[dat$Stn == 'NM3',]
+plot(x$Chla,   x$micChl_frac, pch=16,
+     xlim=range(dat$Chla, na.rm=T),ylim=c(0,1), xlab='Total Chl (µg/L)',ylab='%Micro')
+points(y$Chla, y$micChl_frac)
+legend('bottomright', legend = c('PM7','NM3'), pch=c(16,1), cex=.8)
+
+plot(x$Btot,   x$micB_frac,   pch=16,
+     xlim=range(dat$Btot, na.rm=T),ylim=c(0,1), xlab='Total Biomass (µgC/L)',ylab='%Micro')
+points(y$Btot, y$micB_frac)
+
+dev.off()
+
