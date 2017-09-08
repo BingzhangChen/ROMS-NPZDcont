@@ -15,16 +15,16 @@
       use bio_MOD
       implicit none
       private pi
-      real, parameter :: thetamin = 0.02
-      real, parameter :: thetamax = 0.47
-      real, parameter :: mu0      = 1.0
-      real, parameter :: Qmin     = 0.06 
-      real, parameter :: Qmax     = 0.18
-      real, parameter :: betamu   = -0.025
-      real, parameter :: alphamu  = 0.25,  alphaG =1.0d0
-      real, parameter :: alphaI   = 0.08, aI0_C   =0.06
-      real, parameter :: alphaK   = 0.27, K0N     =0.2
-      real, parameter :: Femin    = 0.02   ! Minimal dissolved Fe conc.
+      real :: thetamin = 0.02
+      real :: thetamax = 0.47
+      real :: mu0      = 1.0
+      real :: Qmin     = 0.06 
+      real :: Qmax     = 0.18
+      real :: betamu   = -0.025
+      real :: alphamu  = 0.25,  alphaG =1.0d0
+      real :: alphaI   = 0.08, aI0_C   =0.06
+      real :: alphaK   = 0.27, K0N     =0.2
+      real :: Femin    = 0.02   ! Minimal dissolved Fe conc.
 
       !Iron:Nitrogen ratio, Aumont et al. (2003) set Fe/C = 4D-6 (mol:mol). 
       !assume redfield ratio of C/N. Times 1000 to convert umol N to nmol Fe
@@ -34,10 +34,11 @@
      &                   PI   = 3.141592653529D0
       contains
 !The iron subroutine must be called after the ODE subroutine
-      subroutine IRONCYCLE(Temp, DET, DFe, PP_ND, PP_NZ,PP_PN,Fe_scav)
+      subroutine IRONCYCLE(Temp, DET, PP_NZ,PP_ND, PP_PN,PP_DZ, Fe_scav,
+     &                     DETFe,DFe)
       implicit none
-      real, intent(in)    :: Temp,DET, PP_ND, PP_NZ, PP_PN
-      real, intent(inout) :: DFe
+      real, intent(in)    :: Temp,DET, PP_ND, PP_NZ, PP_PN, PP_DZ
+      real, intent(inout) :: DFe, DETFe
       real, intent(out)   :: Fe_scav
       real                :: keq, cff
       real, parameter     :: Kscm= 5D-3,  !Minimal scavenging rate (d-1)
@@ -57,12 +58,18 @@
       !Following TOM10Appendix, Eq. 45
       !Iron scavenging rate = (Basal scavenging rate + particle asorbtion)*FEprime
       cff     = 1D0+(lFe-DFe)*keq 
-      Fe_scav = KScm + Ksc*DET*TEMPBOL(Ez,Temp)
-     &               * (-cff + sqrt(cff**2 + 4.*DFe*keq))/2D0/keq  
-      
-      DFe = DFe + ( (PP_ND+PP_NZ-PP_PN)*Fe_N- Fe_scav)*dtdays
 
-      end subroutine
+      Fe_scav = (Kscm + Ksc*DET*TEMPBOL(Ez,Temp)) 
+     &        * (-cff + sqrt(cff**2 + 4D0*DFe*keq))/2D0/keq  
+
+      cff = Fe_N*PP_ND !The regeneration flux from DETFe ==> DFe
+      
+      DFe = DFe + (cff + (PP_NZ-PP_PN) * Fe_N - Fe_scav) * dtdays
+      
+      ! dDETFe/dt = Zooplankton defecation and mortality + scavenging - regeneration
+      DETFe = DETFe + (PP_DZ*Fe_N + Fe_scav - cff)*dtdays
+
+      end subroutine IRONCYCLE
 !----------------------------------------------------------------
 ! The -1 branch of the Lambert-W function
       PURE REAL FUNCTION w1(x)
@@ -162,6 +169,94 @@
       return
       end subroutine
 
+      ! The subroutine for phytoplankton with three traits (size L,
+      ! light log Iopt, Temp Topt
+      subroutine citrate_PHY3(NO3,PAR_,Temp_, Fe, L, x, Z, mu,
+     &     dmudL,d2mudL2, dMudx, d2Mudx2, dMudZ, d2MudZ2 )
+      implicit none
+      real, intent(in)  :: L, x, Z, NO3, PAR_,Temp_, Fe 
+      real, intent(out) :: mu, dmudL, d2mudL2
+      real, intent(out) :: dMudx, d2Mudx2, dMudZ, d2MudZ2 
+
+      real :: umax, alpha,H, G, Iopt, hat, dhatdl, d2hatdl2,cff 
+      real :: fN, Kn,dfNdl,d2fNdl2,d3fNdl3, d4fNdl4
+      real :: KFe,fFe
+      real :: dGdL, d2GdL2, Y, dYdx, d2Ydx2, dHdx, d2Hdx2
+      real :: P, ht, f, dPdZ, d2PdZ2, dfdZ, d2fdZ2
+      real, parameter   ::  b  = .21
+      real, parameter   ::  Eb = .0633
+      real, parameter   ::  a0 = .149, k = -.47 
+      real, parameter   ::  w  = 14.,  T0= 15d0
+      !x: ln optimal light (umol photons m-2 s-1)
+      !Z: optimal temperature (ºC)
+      !L: log cell volume (um^3)
+      !Light term
+      mu0  = .21
+      umax = mu0*exp(b*x)
+      alpha=  a0*exp(k*x)
+      Iopt =     exp(x)
+
+      H  = 1./(PAR_/(alpha*Iopt**2) + 1./umax - 2./(alpha*Iopt) +
+     &           1./(PAR_*alpha))
+      !Note here suboptimal is optimal (even if I < Iopt, because umax is higher, mu is also higher)
+
+      !Size (nutrient) term (L: lnvolume)
+      alphamu= .2
+       betamu= 0d0
+      hat    = exp(alphamu*L + betamu*L**2)
+      dhatdl = hat*(alphamu + 2.*betamu * L)
+      d2hatdl2 = 2.*hat*betamu+hat*(alphamu+2.*betamu*L)**2
+
+      ! Nitrogen limitation:
+      Kn  = ScaleTrait(L, K0N, alphaK)
+      fN  = NO3/(NO3 + Kn)  !Nitrogen limitation index
+
+      ! Iron limitation:
+      KFe = ScaleTrait(L, K0Fe, alphaFe)
+      fFe = Fe/(Fe + KFe)
+      
+
+      if (fN .ge. fFe) then !Iron limitation
+         call MM_2der(Fe, K0Fe,alphaFe, L, Kn,fN,dfNdl,d2fNdl2)
+      else                  !Nitrogen limitation
+         call MM_2der(NO3,K0N,  alphaK, L, Kn,fN,dfNdl,d2fNdl2)
+      endif
+
+      G      = hat * fN
+      !Calculate the derivatives of G
+      dGdL   = hat*dfNdl + dhatdl*fN
+      d2GdL2 = hat*d2fNdl2 + 2.*dfNdl*dhatdl + fN*d2hatdl2
+
+      !Calculate the derivatives of H
+      Y      = 1./H
+      dYdx   = -(k+2.)*I/(alpha*Iopt**2) 
+     &   - b/umax +2.*(k+1.)/(alpha*Iopt) - k/(I*alpha)
+
+      d2Ydx2 = (k+2.)**2*I/(alpha*Iopt**2) + b**2/umax 
+     &   - 2.*(k+1.)**2/(alpha*Iopt) + k**2/(I*alpha)
+
+      dHdx   = -(1./Y**2) * dYdx
+
+      d2Hdx2 = (2./Y**3)*(dYdx)**2 - d2Ydx2/Y**2
+
+      !Temperature term
+      ht      = exp(Eb*(t - T0))
+      P       = 1.-((Temp_ - Z)/w)**2
+      f       = ht * P
+      dPdZ    = 2.*(Temp_  - Z)/w**2
+      d2PdZ2  = -2./w**2
+      dfdZ    = ht*dPdZ 
+      d2fdZ2  = ht*d2PdZ2 
+
+      Mu      = H * G * f
+      dMudx   = G*f*dHdx
+      d2Mudx2 = G*f*d2Hdx2
+      dMudL   = f*H*dGdL
+      d2MudL2 = f*H*d2GdL2
+      dMudZ   = H*G*dfdZ
+      d2MudZ2 = H*G*d2fdZ2
+
+      end subroutine 
       ! The subroutine only for phytoplankton (size as the master trait)
       subroutine PHY_NPZDCONT(NO3,PAR_,Temp_,Fe, PMU, muNet,dmudl,
      &                       d2mudl2,d3mudl3,d4mudl4,
@@ -346,9 +441,23 @@
          Kn = ScaleTrait(L, K0, alphaK)
          fN = N/(N + Kn) ! Nutrient limitation index at avg. size
          dfNdl = -alphaK*Kn*N/(N+Kn)**2
-       d2fNdl2 = -alphaK**2*N*Kn*(1/(N+Kn)**2 - 2*Kn/(N+Kn)**3)
+       d2fNdl2 = -alphaK**2*N*Kn*(1./(N+Kn)**2 - 2.*Kn/(N+Kn)**3)
        d3fNdl3 = alphaK**3*N*Kn*(2.*N*Kn-(Kn-N)**2)/(Kn+N)**4
        d4fNdl4 = alphaK**4*N*Kn*(11.*Kn*N*(N-Kn)+Kn**3-N**3)/(N+Kn)**5  !Correct
       end subroutine
+
+      !Mechaelis-Mention functions and derivatives
+      subroutine MM_2der(N,K0,alphaK,L,Kn,fN, dfNdl, d2fNdl2)
+      implicit none
+      real,   intent(in)  :: N, K0, alphaK, L
+      real,   intent(out) :: fN, dfNdl, d2fNdl2
+      real,   intent(out) :: Kn
+         ! Half saturation constant for growth at avg. size
+         Kn = ScaleTrait(L, K0, alphaK)
+         fN = N/(N + Kn) ! Nutrient limitation index at avg. size
+         dfNdl = -alphaK*Kn*N/(N+Kn)**2
+       d2fNdl2 = -alphaK**2*N*Kn*(1./(N+Kn)**2 - 2.*Kn/(N+Kn)**3)
+      end subroutine
+
       END MODULE
 !endif
