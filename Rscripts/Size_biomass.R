@@ -1,11 +1,10 @@
 #Extract mean size, size variance, and the relationships with total biomass from surface
-nameit = 'npacific'
-pwd1   = 'npacific'
+nameit = 'npacS'
 library(ggplot2)
 library(MASS)
 library(plot3D)
 source('~/Working/FlexEFT1D/Rscripts/LO_theme.R')
-setwd(paste0('~/Roms_tools/Run/',pwd1))
+setwd(paste0('~/Roms_tools/Run/',nameit))
 jet.colors <- colorRampPalette(c("#00007F", "blue", "#007FFF", "cyan",
                      "#7FFF7F", "yellow", "#FF7F00", "red", "#7F0000"))  #A good color
 
@@ -14,6 +13,7 @@ load('PHY0m.Rdata')
 
 #Load total Chl:
 load('Chl0m.Rdata')
+
 Chl0m$Dat[Chl0m$Dat <= 0]        <- NA
 Chl0m$Dat[!is.finite(Chl0m$Dat)] <- NA
 
@@ -49,7 +49,7 @@ microp <- 1-pnorm(ln20, mean_,sd_)
 #PHY.ann[PHY.ann<=0] <- NA
 
 #Calculate annual mean Chl:
-Chl.ann <- apply(Chl0m$Dat, c(1,2), mean)
+Chl.ann <- apply(CHL, c(1,2), mean)
 
 #Calculate annual mean picop:
 
@@ -68,7 +68,7 @@ CHL        <- data.frame(Tchl  =  as.vector(Chl0m$Dat),
 CHL        <- na.omit(CHL)
 dff        <- sample(1:nrow(CHL)
 CHL        <- CHL[dff, ]
-pdf('Size_fraction_model_obs.pdf',width=5,height=8,paper='a4')
+pdf('Size_fraction_model_obs1.pdf',width=5,height=8,paper='a4')
 op <- par(font.lab  = 1,
              family ="serif",
              mar    = c(2,4,1.5,0.5),
@@ -77,7 +77,7 @@ op <- par(font.lab  = 1,
              mfcol  = c(3,1), pch=16, cex=.8, 
              cex.lab=1.2,cex.axis=1.2 ) 
 
-plot(as.vector(Chl.ann), as.vector(picop.ann), log='x',
+plot(as.vector(CHL), as.vector(picop), log='x',
      xlab= '',
      ylab= '%Pico',
      xlim= c(0.02,25), ylim=c(0,1),
@@ -89,7 +89,7 @@ legend('topright',legend=c('Model','Global','K2','S1'),
         cex=1.2,
         pch=c(16,1,2,2),col=1:4)
 
-plot(as.vector(Chl.ann), as.vector(nanop.ann), log='x',
+plot(as.vector(CHL), as.vector(nanop), log='x',
      xlab= '',
      ylab= '%Nano',
      xlim= c(0.02,25), ylim=c(0,1),
@@ -99,7 +99,7 @@ points(K2size$chlt,K2size$nanop,pch=2,col=3)
 points(S1size$chlt,S1size$nanop,pch=2,col=4)
 
 par(mar    = c(4,4,1.5,0.5))
-plot(as.vector(Chl.ann), as.vector(microp.ann), log='x',
+plot(as.vector(CHL), as.vector(microp), log='x',
      xlab= 'Total Chl a (µg/L)',
      ylab= '%Micro',
      xlim= c(0.02,25), ylim=c(0,1),

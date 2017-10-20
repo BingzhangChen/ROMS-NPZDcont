@@ -15,13 +15,15 @@
       use bio_MOD
       implicit none
       private pi
+      integer, parameter :: dp = selected_real_kind(15, 307)
+      integer, parameter :: dg = selected_real_kind(33, 4931)
       real :: thetamin = 0.02
       real :: thetamax = 0.47
       real :: mu0      = 1.0
       real :: Qmin     = 0.06 
       real :: Qmax     = 0.18
-      real :: betamu   = -0.025
-      real :: alphamu  = 0.25,  alphaG =1.0d0
+      real :: betamu   = -0.011
+      real :: alphamu  = 0.2,  alphaG =1.0d0
       real :: alphaI   = 0.08, aI0_C   =0.06
       real :: alphaK   = 0.27, K0N     =0.2
       real :: Femin    = 0.02   ! Minimal dissolved Fe conc.
@@ -172,37 +174,44 @@
       ! The subroutine for phytoplankton with three traits (size L,
       ! light log Iopt, Temp Topt
       subroutine citrate_PHY3(NO3,PAR_,Temp_, Fe, L, x, Z, mu,
-     &     dmudL,d2mudL2, dMudx, d2Mudx2, dMudZ, d2MudZ2 )
+     &     dmudL,d2mudL2, dMudx, d2Mudx2, dMudZ, d2MudZ2, theta, QN,
+     &     dthetadl, d2thetadl2, dQNdL, d2QNdL2, dthetadZ, d2thetadZ2,
+     &     dthetadx, d2thetadx2)
       implicit none
-      real, intent(in)  :: L, x, Z, NO3, PAR_,Temp_, Fe 
-      real, intent(out) :: mu, dmudL, d2mudL2
-      real, intent(out) :: dMudx, d2Mudx2, dMudZ, d2MudZ2 
+      real(dp), intent(in)  :: L, x, Z, NO3, PAR_,Temp_, Fe 
+      real(dp), intent(out) :: mu, dmudL, d2mudL2
+      real(dp), intent(out) :: dMudx, d2Mudx2, dMudZ, d2MudZ2 
+      real(dp), intent(out) :: theta, QN, dthetadl, d2thetadl2
+      real(dp), intent(out) :: dQNdL, d2QNdL2,dthetadZ,d2thetadZ2
+      real(dp), intent(out) :: dthetadx, d2thetadx2
+      real(dp) :: umax, alpha,H, G, Iopt, hat, dhatdl, d2hatdl2,cff 
+      real(dp) :: fN, Kn,dfNdl,d2fNdl2,d3fNdl3, d4fNdl4
+      real(dp) :: KFe,fFe
+      real(dp) :: dGdL, d2GdL2, Y, dYdx, d2Ydx2, dHdx, d2Hdx2
+      real(dp) :: P, ht, f, dPdZ, d2PdZ2, dfdZ, d2fdZ2
+      real(dp) :: cff1, dcffdl, cff2 
+      real(dg) :: cff3
+      real(dp), parameter   ::  b  = .21
+      real(dp), parameter   ::  Eb = .0633
+      real(dp), parameter   ::  a0 = .34, k = -.47 
+      real(dp), parameter   ::  w  = 14.,  T0= 15d0
 
-      real :: umax, alpha,H, G, Iopt, hat, dhatdl, d2hatdl2,cff 
-      real :: fN, Kn,dfNdl,d2fNdl2,d3fNdl3, d4fNdl4
-      real :: KFe,fFe
-      real :: dGdL, d2GdL2, Y, dYdx, d2Ydx2, dHdx, d2Hdx2
-      real :: P, ht, f, dPdZ, d2PdZ2, dfdZ, d2fdZ2
-      real, parameter   ::  b  = .21
-      real, parameter   ::  Eb = .0633
-      real, parameter   ::  a0 = .149, k = -.47 
-      real, parameter   ::  w  = 14.,  T0= 15d0
       !x: ln optimal light (umol photons m-2 s-1)
       !Z: optimal temperature (ºC)
       !L: log cell volume (um^3)
       !Light term
-      mu0  = .21
+      mu0  = .3
       umax = mu0*exp(b*x)
       alpha=  a0*exp(k*x)
       Iopt =     exp(x)
 
-      H  = 1./(PAR_/(alpha*Iopt**2) + 1./umax - 2./(alpha*Iopt) +
+      H  = 1./(PAR_/(alpha*Iopt*Iopt) + 1./umax - 2./(alpha*Iopt) +
      &           1./(PAR_*alpha))
       !Note here suboptimal is optimal (even if I < Iopt, because umax is higher, mu is also higher)
 
       !Size (nutrient) term (L: lnvolume)
       alphamu= .2
-       betamu= 0d0
+       betamu= -0.011
       hat    = exp(alphamu*L + betamu*L**2)
       dhatdl = hat*(alphamu + 2.*betamu * L)
       d2hatdl2 = 2.*hat*betamu+hat*(alphamu+2.*betamu*L)**2
@@ -229,32 +238,63 @@
 
       !Calculate the derivatives of H
       Y      = 1./H
-      dYdx   = -(k+2.)*I/(alpha*Iopt**2) 
-     &   - b/umax +2.*(k+1.)/(alpha*Iopt) - k/(I*alpha)
+      cff    = PAR_/(alpha*Iopt*Iopt)
+      dYdx   = -(k+2.)*cff
+     &   - b/umax +2.*(k+1.)/(alpha*Iopt) - k/(PAR_*alpha)
 
-      d2Ydx2 = (k+2.)**2*I/(alpha*Iopt**2) + b**2/umax 
-     &   - 2.*(k+1.)**2/(alpha*Iopt) + k**2/(I*alpha)
+      d2Ydx2 = (k+2.)**2*cff + b*b/umax 
+     &   - 2.*(k+1.)**2/(alpha*Iopt) + k**2/(PAR_*alpha)
 
-      dHdx   = -(1./Y**2) * dYdx
-
-      d2Hdx2 = (2./Y**3)*(dYdx)**2 - d2Ydx2/Y**2
+      dHdx   = -H*H*dYdx
+      d2Hdx2 = (2.*H*H*H)*dYdx*dYdx - d2Ydx2*H*H
 
       !Temperature term
-      ht      = exp(Eb*(t - T0))
+      ht      = exp(Eb*(Temp_ - T0))
       P       = 1.-((Temp_ - Z)/w)**2
       f       = ht * P
-      dPdZ    = 2.*(Temp_  - Z)/w**2
-      d2PdZ2  = -2./w**2
+      dPdZ    = 2.*(Temp_  - Z)/(w*w)
+      d2PdZ2  = -2./(w*w)
       dfdZ    = ht*dPdZ 
       d2fdZ2  = ht*d2PdZ2 
 
-      Mu      = H * G * f
+      f       = max(f, 0d0)
+      Mu      = H*G*f
       dMudx   = G*f*dHdx
       d2Mudx2 = G*f*d2Hdx2
       dMudL   = f*H*dGdL
       d2MudL2 = f*H*d2GdL2
       dMudZ   = H*G*dfdZ
       d2MudZ2 = H*G*d2fdZ2
+
+     !N:C ratio at avg. size (assumed independent of light and temp.)
+      cff1    = 1.-Qmin/Qmax
+      cff     = 1.-cff1*fN
+      QN      = Qmin/cff
+
+      dcffdl  = -cff1*dfNdl
+      dQNdL   = cff1/cff**2 * dfNdl * Qmin
+      cff2    = 1./cff**2
+      cff3    = cff2/cff
+      !d2QNdL2 = Qmin*cff1*(d2fNdl2/cff**2 - 2.D0/cff**3*dfNdl*dcffdl)
+      d2QNdL2 = Qmin*cff1*(d2fNdl2*cff2 - 2.*cff3*dfNdl*dcffdl)  !Correct
+
+      cff     = (thetamax - thetamin)/PAR_
+      !Chl:C ratio at avg. traits
+      theta      = thetamin+Mu/alpha*cff   !Unit: gChl/molC
+       
+      !alpha only depends on Iopt
+      !Derivatives at mean size
+      dthetadl   = cff/alpha*dMudL
+      d2thetadl2 = cff/alpha*d2MudL2
+ 
+      !Derivatives at mean temp.
+      dthetadZ   = cff/alpha*dMudZ
+      d2thetadZ2 = cff/alpha*d2MudZ2
+
+      !Derivatives at mean Iopt.
+      dthetadx   = cff*dY_Xdl(mu, alpha, dMudx, k*alpha) 
+      d2thetadx2 = cff*d2Y_Xdl2(mu,alpha,dMudx, k*alpha, d2Mudx2,
+     &                                             k**2*alpha)
 
       end subroutine 
       ! The subroutine only for phytoplankton (size as the master trait)
@@ -426,8 +466,10 @@
       pure real function d2Y_Xdl2(Y, X, dYdl, dXdl, d2Ydl2, d2Xdl2) 
       implicit none
       real, intent(in)    :: Y, X, dYdl, dXdl, d2Ydl2, d2Xdl2
+      real(dg)            :: cff
+       cff = 1./(X*X*X)
        d2Y_Xdl2 = d2Ydl2/X - 2.*dYdl*dXdl/(X**2) - Y/(X**2)*d2Xdl2 +
-     &                                          2.*Y/(X**3)*(dXdl**2)
+     &                                            2.*Y*cff*(dXdl**2)
       end function
 
       !Mechaelis-Mention functions and derivatives
@@ -449,14 +491,16 @@
       !Mechaelis-Mention functions and derivatives
       subroutine MM_2der(N,K0,alphaK,L,Kn,fN, dfNdl, d2fNdl2)
       implicit none
-      real,   intent(in)  :: N, K0, alphaK, L
-      real,   intent(out) :: fN, dfNdl, d2fNdl2
-      real,   intent(out) :: Kn
+      real(dp),   intent(in)  :: N, K0, alphaK, L
+      real(dp),   intent(out) :: fN, dfNdl, d2fNdl2
+      real(dp),   intent(out) :: Kn
+      real(dp) :: cff
          ! Half saturation constant for growth at avg. size
          Kn = ScaleTrait(L, K0, alphaK)
+         cff= N+Kn
          fN = N/(N + Kn) ! Nutrient limitation index at avg. size
          dfNdl = -alphaK*Kn*N/(N+Kn)**2
-       d2fNdl2 = -alphaK**2*N*Kn*(1./(N+Kn)**2 - 2.*Kn/(N+Kn)**3)
+       d2fNdl2 = -alphaK**2*N*Kn*(1./(N+Kn)**2 - 2.*Kn/(cff*cff*cff))
       end subroutine
 
       END MODULE

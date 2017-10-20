@@ -18,6 +18,8 @@ mask    <- readnc('mask_rho',         avgfile, nameit = nameit)
 mask    <- mask$data
 Lon     <- NO3_s$Lon
 Lat     <- NO3_s$Lat
+L       <- length(Lon)
+M       <- length(Lat)
 MASK <- function(dat){
    NT <- dim(dat)[3]
    for (i in 1:NT){
@@ -43,7 +45,6 @@ image2D(NO3a, Lon, Lat,
           col = jet.colors(18),   zlim = c(0,30), 
          xaxt = 'n',frame = F,
          xlab = "", ylab = "Latitude (ºN)")
-
 
 #Get final year
 NMo     <- length(NO3_s$days)
@@ -86,7 +87,46 @@ chl     <- na.omit(chl)
 taylor.diagram(log(no3$obs), log(no3$mod), normalize=T)
 taylor.diagram(log(chl$obs), log(chl$mod), col=3, add=T, normalize=T)
 
-#
+#Get depth integrated NPP (model)
+
+biofile <- 'npacS_dbio_avg.nc'
+NPPm    <- ncread(biofile, 'oPPt')  #ROMS outputs of NPP
+NPPm    <- NPPm[,,,NMo]
+NPPI    <- array(0, dim = c(L, M, 12)) #Integrated NPP to be calculated (unit: mgC m-2 d-1)
+#Get depth of ROMS
+CFF     <- readnc('NO3_roms', avgfile, nameit='npacS',ROMS=T)
+Hz      <- CFF$Hz
+Depth   <- CFF$depth
+
+#Get euphotic depth:
+Euh     <- ncread(avgfile,'hel')
+pm      <- ncread(avgfile,'pm')
+pn      <- ncread(avgfile,'pn')
+
+#Integrate:
+for (i in 1:L){
+    for (j in 1:M){
+        for (k in 1:12){
+            npp         <- NPPm[i,j,,k]  #NPP depth profile
+            NPPI[i,j,k] <- NPPI[i,j,k] + sum(npp*Hz[i,j,])*mask[i,j] #Unit: mgC m-2 d-1
+        }
+    }
+}
+
+#Get obs. data:
+vgpm    <- ncread(clmname,'NPP_vgpm')
+
+#Plot:
+NPP_ann <- apply(NPPI, c(1,2), mean)
+NPP_ann[NPP_ann <= 0] <- NA 
+image2D(NPP_ann, Lon, Lat, 
+          col = jet.colors(18), 
+         xaxt = 'n',frame = F,
+         xlab = "", ylab = "Latitude (ºN)")
+
+
+area        <- 1/pm[i,j]/pn[i,j]
+
 
 #Get mean size:
 LNV   = get_sur('LNV',  file = avgfile, nameit = 'npacS')
@@ -135,16 +175,6 @@ microp <- 1-pnorm(ln20, mean_,sd_)
  picop <-   pnorm(ln2,  mean_,sd_)
  nanop <- 1-microp-picop
 
-#Get data in the last time:
-NO3 = NO3_s$data
-NO3 = NO3[,,dim(NO3)[3]]
-NO3 = NO3[,,1]
-NO3[mask==0] = NA
-NO3max = quantile(NO3, probs=0.99, na.rm=T)
-image2D(NO3, Lon, Lat, 
-          col = jet.colors(18),   zlim = c(0,NO3max), 
-         xaxt = 'n',frame = F,
-         xlab = "", ylab = "Latitude (ºN)")
 
 PHY   = get_sur('PHYTO',  file = avgfile, nameit = 'npacS')
 PHY   = PHY$data
@@ -188,27 +218,6 @@ image2D(VTo1, Lon, Lat,
          xaxt = 'n',frame = F,
          xlab = "", ylab = "Latitude (ºN)")
 
-
-MIo   = get_sur('MIo',    file = avgfile, nameit = 'npacS')
-MIo   = MIo$data
-MIo   = MIo/PHY
-MIo1  = MIo[,,dim(MIo)[3]]
-MIomax = quantile(MIo1, probs=0.99, na.rm=T)
-
-image2D(MIo1, Lon, Lat, 
-          col = jet.colors(18),   zlim = c(0,log(1000)), 
-         xaxt = 'n',frame = F,
-         xlab = "", ylab = "Latitude (ºN)")
-
-VIo   = get_sur('VIo',    file = avgfile, nameit = 'npacS')
-VIo   = VIo$data
-VIo   = VIo/PHY - MIo^2
-VIo1  = VIo[,,dim(VIo)[3]]
-VIomax = quantile(VIo1, probs=0.99, na.rm=T)
-image2D(VIo1, Lon, Lat, 
-          col = jet.colors(18),   zlim = c(-5,10), 
-         xaxt = 'n',frame = F,
-         xlab = "", ylab = "Latitude (ºN)")
 
 
 mask    <- mask$data
@@ -255,7 +264,6 @@ avgfile3  <- '~/Roms_tools/run/NpacS_NODIV/npacS_avg2.nc'
 avgfile4  <- '~/Roms_tools/run/NpacS_NOTEMP/npacS_avg11.nc' 
 
 # ROMS biological diagnostic file:
-biofile   <- '~/Roms_tools/run/NpacS/npacS_dbio_avg.nc'
 mu   = get_sur('omuNet',    file = biofile, nameit = 'npacS')
 mu   = mu$data
 mu1  = mu[,,dim(mu)[3]]

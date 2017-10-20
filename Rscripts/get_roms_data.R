@@ -1,4 +1,4 @@
-source('~/Working/Global_PP/Interpolate_WOA.R')
+source('~/Working/FlexEFT1D/Rscripts/Interpolate_WOA.R')
 #Get all the data of 4D NPP (final year):
 get_sur <- function(Var,file, nameit){
     NPP = readnc(Var, sourcefile = file, nameit = nameit)
