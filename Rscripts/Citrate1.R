@@ -8,15 +8,8 @@ library(plotrix) #For Taylor diagram
 
 #Read file
 nameit  <- 'npacS'
-avgfile <- paste0(nameit,'_avg.nc')
-biofile <- paste0(nameit,'_dbio_avg.nc')
-
-#Check initial file
-#inifile <- paste0(nameit,'-ini.nc') 
-#PHY_ini <- ncread(inifile,'PHYTO')
-#PMU_ini <- ncread(inifile,'LNV')
-#PMU_ini <- PMU_ini/PHY_ini
-
+avgfile <- paste0(nameit,'_avg1.nc')
+biofile <- paste0(nameit,'_dbio_avg1.nc')
 
 #Get 'surface area'
 pm      <- ncread(avgfile,'pm')  #Unit: m-1
@@ -64,6 +57,16 @@ Sur_mean <- function(ncfile, VAR){
    DAT.a[,1]      <- NA
    return(DAT.a)
 }
+#Get surface data of modeled data:
+MASK <- function(dat){
+   NT <- dim(dat)[3]
+   for (i in 1:NT){
+       y          <- dat[,,i]
+       y[mask==0] <- NA
+       dat[,,i]   <- y
+   }
+   return(dat)
+}
 
 #Get final year
 NMo     <- length(days)
@@ -86,8 +89,8 @@ lon1 = seq(100,280,by=20)
 lon2 = lon1
 lon2[lon2>180]=lon2[lon2>180]-360
 
-source('~/Roms_tools/Rscripts/mod_dat_sur.R')
-source('~/Roms_tools/Rscripts/mod_dat_month.R')
+source('~/Roms_tools/Rscripts/mod_dat_paper.R')
+#source('~/Roms_tools/Rscripts/mod_dat_month.R')
 source('~/Roms_tools/Rscripts/plot_bio.R')
 source('~/Roms_tools/Rscripts/Size_Biomass.R')
 source('~/Roms_tools/Rscripts/NPP_VAR.R')
@@ -97,7 +100,6 @@ source('~/Roms_tools/Rscripts/Plot_diff.R')
 source('~/Roms_tools/Rscripts/get_BOX.R')
 #Plot out:
 source('~/Roms_tools/Rscripts/TS_2box.R')
-stop('Finish!')
 #Make a video:
 #CHL.m 
 for (i in 1:dim(CHL.m)[3]){

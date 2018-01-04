@@ -2,20 +2,37 @@
 prefix1  <- '~/Roms_tools/Run/NPacS1_'
 prefix2  <- '~/Roms_tools/Run/NPacS1_KTW_'
 nameit   <- 'npacS'
-profix2  <- paste0('/',nameit,'_dbio_avg.nc')
-profix1  <- paste0('/',nameit,'_avg.nc')
+profix2  <- paste0('/',nameit,'_dbio_avg')
+profix1  <- paste0('/',nameit,'_avg')
 VTR      <- c(0,0.01,0.03,0.05,0.07,0.1)
 alphaG   <- VTR
 N        <- length(VTR)
-biof_TD  <- paste0(prefix1, VTR, profix2)
-avgf_TD  <- paste0(prefix1, VTR, profix1)
-biof_KTW <- paste0(prefix2, alphaG, profix2) 
-avgf_KTW <- paste0(prefix2, alphaG, profix1) 
-biof_KTW[1] <- biof_TD[1]
-avgf_KTW[1] <- avgf_TD[1]
+biof_TD  <- matrix(NA, nr = 10, nc = N)
+avgf_TD  <- biof_TD
+biof_KTW <- biof_TD
+avgf_KTW <- biof_TD
+for (i in 1:nrow(biof_TD)){
+   biof_TD[i,]  <- paste0(prefix1, VTR, profix2,i,'.nc')
+   avgf_TD[i,]  <- paste0(prefix1, VTR, profix1,i,'.nc')
+  biof_KTW[i,]  <- paste0(prefix2, alphaG, profix2,i,'.nc') 
+  avgf_KTW[i,]  <- paste0(prefix2, alphaG, profix1,i,'.nc') 
+}
+biof_KTW[,1] <- biof_TD[,1]
+avgf_KTW[,1] <- avgf_TD[,1]
+NPP_TD       <- matrix(NA, nr = 10, nc = N)
+NPP_KTW      <- NPP_TD
+system.time( 
+    for (i in 1:6){
+       NPP_TD[,i] <- sapply(1:nrow(biof_TD), function(j)integT(biof_TD[j,i]))
+    }
+)
 
-NPP_TD   <- sapply(1:N, function(i)integT(biof_TD[i]))
-NPP_KTW  <- sapply(1:N, function(i)integT(biof_KTW[i]))  
+system.time( 
+    for (i in 2:6){
+       NPP_KTW[,i] <- sapply(1:nrow(biof_KTW), function(j)integT(biof_KTW[j,i]))
+    }
+)
+
 
 pdf('TNPP_VTR.pdf',width=5, height=5,paper = 'a4')
 op <- par( font.lab  = 1,
@@ -78,6 +95,21 @@ for (i in 1:length(avgFiles)){
              col = jet.colors(18),   zlim = c(0,8), 
             xaxt = 'n',frame = F,
             xlab = "", ylab = "")
+   axis(side=1, at = lon1, labels=lon2)
+   mtext('Mean size (µm)',adj = 1, cex=.8)
+
+   cff  <- meanVAR(avgf_TD[2,1])
+   cff1 <- meanVAR(avgf_TD[2,6])
+   par(mfrow=c(2,1))
+   image2D(cff$LNV, Lon, Lat,    #Modeled size variance
+             col = jet.colors(18),   zlim = c(0,8), 
+            xaxt = 'n',frame = F,
+            xlab = "", ylab = "")
+   image2D(cff1$LNV, Lon, Lat,    #Modeled size variance
+             col = jet.colors(18),   zlim = c(0,8), 
+            xaxt = 'n',frame = F,
+            xlab = "", ylab = "")
+
    axis(side=1, at = lon1, labels=lon2)
    mtext('Mean size (µm)',adj = 1, cex=.8)
 

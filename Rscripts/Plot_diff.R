@@ -49,33 +49,33 @@ f2   <- data.frame(x=as.numeric(muAvg.dff), y=as.numeric(NPP.dff))
 f2   <- na.omit(f2)
 f2   <- kde2d(f2$x, f2$y, n = 50, lims = c(-0.1, .1, -.1, .1))
 
-pdf('NPP_VAR_diff.pdf',width=6, height=8,paper='a4')
+pdf('NPP_VAR_diff.pdf',width=6, height=4,paper='a4')
 op <- par( font.lab  = 1,
              family  ="serif",
              mar     = c(4,4,1.5,2),
              mgp     = c(2.3,1,0),
              cex.lab = 1.4,
              lwd     = 1.5,
-             mfcol   = c(2,1),
+             mfcol   = c(1,1),
              cex.axis=1) 
 
 image2D(NPP.dff, Lon, Lat, 
           col = jet.colors(18), # zlim = ZLIM,
          xaxt = 'n',frame = F,
          xlab = "Longitude (ºE)", ylab = "Latitude (ºN)")
-DRAW()
-mtext('a) NPP log ratio of high vs. low diversity', adj=0, line = .5)
+#DRAW()
+#mtext('a) NPP log ratio of high vs. low diversity', adj=0, line = .5)
 lon1 = seq(100,280,by=20)
 lon2 = lon1
 lon2[lon2>180]=lon2[lon2>180]-360
 axis(side=1, at = lon1, labels=lon2)
 
-image2D(f2, col = jet.colors(20),  # zlim = c(0,.05), 
-        xlab='Productivity log ratios',
-        ylab='NPP log ratios')
-
-#plot(as.vector(muAvg.dff), as.vector(NPP.dff), pch=16, cex=.5, 
-abline(0,1)
-mtext('b)', adj=0, line = .5)
+#image2D(f2, col = jet.colors(20),  # zlim = c(0,.05), 
+#        xlab='Productivity log ratios',
+#        ylab='NPP log ratios')
+#
+##plot(as.vector(muAvg.dff), as.vector(NPP.dff), pch=16, cex=.5, 
+#abline(0,1)
+#mtext('b)', adj=0, line = .5)
 dev.off()
 

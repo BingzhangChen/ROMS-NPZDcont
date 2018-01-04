@@ -7,7 +7,6 @@ NO3s    <- MASK(NO3s)
 NO3a    <- apply(NO3s, c(1,2), mean)  #Seasonal average
 NO3a[mask==0] <- NA
 
-
 #Get seawifs data:
 CHLclm  <- ncread(clmname, 'CHLA')
 CHLs    <- CHLclm[,,Nz,]  #Surface CHL from SEAWIFS
@@ -31,13 +30,10 @@ CHL2[mask==0] <- NA   #Annual mean CHL from SEAWIFS
 
 #Get NPP data from vgpm:
 vgpm    <- ncread(clmname,'NPP_vgpm')
-eppl    <- ncread(clmname,'NPP_eppl')
 cbpm    <- ncread(clmname,'NPP_cbpm')
 
 vgpm.a  <- apply(vgpm, c(1,2), mean)
 vgpm.a[mask == 0] <- NA
-eppl.a  <- apply(eppl, c(1,2), mean)
-eppl.a[mask == 0] <- NA
 cbpm.a  <- apply(cbpm, c(1,2), mean)
 cbpm.a[mask == 0] <- NA
 
@@ -86,7 +82,6 @@ NPPI  <- integ(biofile)
 NPP.m <- NPPI
 vgpm  <- MASK(vgpm)
 cbpm  <- MASK(cbpm)
-eppl  <- MASK(eppl)
 vgpm  <- as.numeric(vgpm)
 cbpm  <- as.numeric(cbpm)
 npp   <- data.frame( mod =as.numeric(NPP.m), 
@@ -97,12 +92,12 @@ npp   <- na.omit(npp)
 NPP_ann            <- apply(NPPI, c(1,2), mean)
 NPP_ann[mask == 0] <- NA 
 
-NO3m <- NO3_s$data
-NO3m <- NO3m[,,NMo]
-NO3m <- MASK(NO3m)
-CHL  <- ncread(avgfile, 'CHL')
-CHL  <- CHL[,,Nroms,NMo]
-CHL.m<- MASK(CHL)
+NO3m    <- NO3_s$data
+NO3m    <- NO3m[,,NMo]
+NO3m    <- MASK(NO3m)
+CHL     <- ncread(avgfile, 'CHL')
+CHL     <- CHL[,,Nroms,NMo]
+CHL.m   <- MASK(CHL)
 
 #Plot Taylorgram for NO3:
 NO3m    <- as.numeric(NO3m)
@@ -138,14 +133,14 @@ picof.m         <- pnorm(logV(2),  mean_, sd_)
 nanof.m         <- pnorm(logV(20), mean_, sd_)
 microf.m        <- 1 - nanof.m
 nanof.m         <- nanof.m - picof.m
-picof.m.ann     <- apply(picof.m, c(1,2), mean)
+picof.m.ann     <- apply(picof.m,c(1,2),function(x)mean(x,na.rm=T))
 nanof.m.ann     <- apply(nanof.m, c(1,2), mean)
 microf.m.ann    <- apply(microf.m, c(1,2), mean)
 picof.m.ann[,1] <- NA
 nanof.m.ann[,1] <- NA
 microf.m.ann[,1]<- NA
 
-mod_dat_file <- paste0(nameit,'-mod-dat.pdf')
+mod_dat_file <- paste0(nameit,'-mod-dat-paper.pdf')
 pdf(mod_dat_file,width=6, height=11,paper='a4')
 
 op <- par( font.lab  = 1,
@@ -254,12 +249,12 @@ taylor.diagram(log(no3$obs), log(no3$mod), add=T,normalize=T, )
 taylor.diagram(log(chl$obs), log(chl$mod), col=3, add=T, normalize=T)
 taylor.diagram(log(npp$cbpm),log(npp$mod), col=5, add=T, normalize=T)
 taylor.diagram(pico$obs,     pico$mod,     col=6, add=T, normalize=T)
-taylor.diagram(nano$obs,     nano$mod,     col=7, add=T, normalize=T)
-taylor.diagram(micro$obs,    micro$mod,    col=8, add=T, normalize=T)
+#taylor.diagram(nano$obs,     nano$mod,     col=7, add=T, normalize=T)
+#taylor.diagram(micro$obs,    micro$mod,    col=8, add=T, normalize=T)
 legend('topright', 
        legend = c('NO3','Chl','NPP,vgpm','NPP,cbpm',
-                  '%Pico','%Nano','%Micro'),
-       col = 2:8, pch = 16, cex=0.6)
+                  '%Pico'),
+       col = 2:6, pch = 16, cex=0.6)
 
 mtext('Latitude (ºN)', side=2, outer=T)
 mtext('Longitude (ºE)',side=1, outer=T, adj=0.25)
