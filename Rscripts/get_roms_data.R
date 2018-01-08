@@ -1,4 +1,4 @@
-source('~/Working/Global_PP/Interpolate_WOA.R')
+source('~/Working/FlexEFT1D/Rscripts/Interpolate_WOA.R')
 #Get all the data of 4D NPP (final year):
 get_sur <- function(Var,file, nameit){
     NPP = readnc(Var, sourcefile = file, nameit = nameit)
@@ -44,25 +44,40 @@ DrawRect <- function(x0, y0, x1, y1){
 }
 
 #Draw the dynamics of mean trait values within these two boxes:
+#Only applicable for one-year nc file
 get_box <- function(Var, file, dLon, dLat){
     #dLon and dLat must be two end points defining the range
-    NPP = readnc(Var, sourcefile = file)
-    
+    #NPP = readnc(Var, sourcefile = file)
+    dat <- ncread(file, Var)
+
+    #Retrieve the final year
+    time    <- ncread(file, 'time_step')
+    time    <- time[1,]  #Time step from initialization (0 year, Jan 1)
+    dt      <- 1200      #a time step
+    days    <- as.integer(time*dt/86400)
+    year    <- days/365
+
+    #Find the closest number one year before ending
+    NMo     <- which.min(abs(year + 1 - year[length(year)]))
+    NMo     <- NMo:length(year)
+
     #Number of vertical layers:
-    N   = dim(NPP$depth)[3]
+    #N   = dim(NPP$depth)[3]
     
     #Plot surface NPP:
-    dat = NPP$data[,,N,]
+    #dat = NPP$data[,,N,NMo]
+    dat          <- dat[,,Nroms,NMo]
+    dat[mask==0] <- NA
     
     #Obtain the data:
-    Klon= which(NPP$lon >= dLon[1] & NPP$lon <= dLon[2]) 
-    Klat= which(NPP$lat >= dLat[1] & NPP$lat <= dLat[2])
+    Klon= which(Lon >= dLon[1] & Lon <= dLon[2]) 
+    Klat= which(Lat >= dLat[1] & Lat <= dLat[2])
      dat= dat[Klon,Klat,]
-     dat[dat==0] = NA
      dat= apply(dat, 3, function(x)mean(x,na.rm=T))
-     days = sort(NPP$time)
-     dat  = dat[order(NPP$time)]
-    return(list(days=days,dat=dat))
+     #days = sort(NPP$time)
+     #dat  = dat[order(NPP$time)]
+    #return(list(days=days,dat=dat))
+     return(dat)
 }
 #Draw the dynamics of mean trait values within these two boxes (for HIGH RESOLUTION):
 get_boxH <- function(Var, Hdiv=T, dLon, dLat){
