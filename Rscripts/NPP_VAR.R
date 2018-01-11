@@ -27,9 +27,12 @@ system.time(
     }
 )
 
+NPP_TD_mean <- apply(NPP_TD, 2, mean)
+NPP_TD_sd   <- apply(NPP_TD, 2, sd)
+
 system.time( 
     for (i in 2:6){
-       NPP_KTW[,i] <- sapply(1:nrow(biof_KTW), function(j)integT(biof_KTW[j,i]))
+       try(NPP_KTW[,i] <- sapply(1:nrow(biof_KTW), function(j)integT(biof_KTW[j,i])))
     }
 )
 
@@ -41,9 +44,12 @@ op <- par( font.lab  = 1,
              mgp     = c(2.3,1,0),
              cex.lab = 1.2,
              mfrow   = c(1,1)  )
-plot(VTR, NPP_TD, type = 'b',
+plot(VTR, NPP_TD_mean, type = 'b',
      xlab = 'Coefficient of TD or KTW',
      ylab = bquote('Annual primary production ('*'PgC '*y^-1*')'))
+low  <- NPP_TD_mean - 2*NPP_TD_sd
+high <- NPP_TD_mean + 2*NPP_TD_sd
+segments(VTR, low, VTR, high) 
 points(alphaG,NPP_KTW, type = 'b', pch=2)
 legend('topright', legend = c('TD', 'KTW'), pch=1:2)
 dev.off()
@@ -70,12 +76,24 @@ op <- par( font.lab  = 1,
              pch     = 16,
              mfrow   = c(3,3)  )
 
-avgFiles <- c(avgf_TD[1], avgf_TD[N], avgf_KTW[N])
-bioFiles <- c(biof_TD[1], biof_TD[N], biof_KTW[N])
+Nrep     <- nrow(avgf_TD)
+avgFiles <- matrix('', nr = Nrep, nc = 3)
+bioFiles <- avgFiles
+for (i in 1:Nrep){
+  avgFiles[i,] <- c(avgf_TD[i,1], avgf_TD[i,N], avgf_KTW[i,N])
+  bioFiles[i,] <- c(biof_TD[i,1], biof_TD[i,N], biof_KTW[i,N])
+}
 NPPname  <- bquote('NPP (mg C '*m^-2*' '*d^-1*')')
 VARname  <- expression(paste("Size variance "*'(ln '*µm^3*')'^2))
-for (i in 1:length(avgFiles)){
-   image2D(meanVAR(avgFiles[i])$VAR, Lon, Lat,    #Modeled size variance
+for (i in 1:ncol(avgFiles)){
+
+    #Calculate mean for 10 replicates
+    cff <- array(, c(L, M, Nrep))
+    for (j in 1:Nrep){
+      cff[ , , j] <- meanVAR(avgFiles[j,i])$VAR
+    }
+    cff <- apply(cff, c(1,2), mean)
+   image2D(cff, Lon, Lat,    #Modeled size variance
              col = jet.colors(18),   zlim = c(0,8), 
             xaxt = 'n',frame = F,
             xlab = "", ylab = "")
@@ -91,7 +109,14 @@ for (i in 1:length(avgFiles)){
    }
    mtext(Varname,adj = -0.3, cex=.8)
    mtext(VARname,adj = 1.2, cex=.8)
-   image2D(meanVAR(avgFiles[i])$LNV, Lon, Lat,    #Modeled size variance
+
+   cff <- array(, c(L, M, Nrep))
+   for (j in 1:Nrep){
+      cff[ , , j] <- meanVAR(avgFiles[j,i])$LNV
+   }
+   cff <- apply(cff, c(1,2), mean)
+
+   image2D(cff, Lon, Lat,    #Modeled size variance
              col = jet.colors(18),   zlim = c(0,8), 
             xaxt = 'n',frame = F,
             xlab = "", ylab = "")
@@ -124,5 +149,6 @@ for (i in 1:length(avgFiles)){
 mtext('Longitude (ºE)',side=1, outer=T, line=1)
 mtext('Latitude  (ºN)',side=2, outer=T, line=1)
 dev.off()
+
 
 

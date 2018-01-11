@@ -1,4 +1,6 @@
 #Get obs. data:
+library(Rcpp)
+sourceCpp('~/Roms_tools/Rscripts/integNPP.cpp')
 clmname <- paste0(nameit, '-clim.nc') 
 NO3clm  <- ncread(clmname, 'NO3')
 Nz      <- dim(NO3clm)[3]
@@ -39,37 +41,41 @@ cbpm.a[mask == 0] <- NA
 
 #Get depth integrated NPP (model)
 #ROMS outputs of NPP
-integ <- function(biofile, var = 'oPPt'){
-   NPPm <- ncread(biofile, var)  
-   NPPm <- NPPm[,,,NMo]
-   NPPI <- array(0, dim = c(L, M, 12)) #Integrated NPP to be calculated (unit: mgC m-2 d-1)
-   
-   #Integrate:
-   for (i in 1:L){
-       for (j in 1:M){
-            dep <- Depth[i,j,]   #Depth profile
-            w   <- dep > -260
-           for (k in 1:12){
-               npp         <- NPPm[i,j,w,k]  #NPP depth profile
-               NPPI[i,j,k] <- NPPI[i,j,k] +
-                              sum(npp*Hz[i,j,w])*mask[i,j] #Unit: mgC m-2 d-1
-           }
-       }
-   }
-   
+#Vertical integration
+vinteg <- function(biofile, var = 'oPPt'){
+   NPPm <- ncread(biofile, var, 
+                  start = c(1,1,1,NMo[1]), 
+                  count = c(L,M,Nroms,length(NMo)))  
+   NPPI <- integC(L, M, length(NMo), Nroms, Depth, Hz, NPPm)
+   #NPPI <- array(0, dim = c(L, M, 12)) #Integrated NPP to be calculated (unit: mgC m-2 d-1)
+   #
+   ##Integrate:
+   #for (i in 1:L){
+   #    for (j in 1:M){
+   #         dep <- Depth[i,j,]   #Depth profile
+   #         w   <- dep > -260
+   #        for (k in 1:12){
+   #            npp         <- NPPm[i,j,w,k]  #NPP depth profile
+   #            NPPI[i,j,k] <- NPPI[i,j,k] +
+   #                           sum(npp*Hz[i,j,w])*mask[i,j] #Unit: mgC m-2 d-1
+   #        }
+   #    }
+   #}
+   NPPI      <- array(NPPI, c(L, M, length(NMo)))
    NPPI[,1,] <- NA  #Remove data from the south boundary
    dat       <- MASK(NPPI)
    return(dat)
 }
 
+#Calculate the annual mean NPP integrated over the vertical water column
 integann <- function(biofile, var = 'oPPt'){
-   NPP_               <- integ(biofile)
+   NPP_               <- vinteg(biofile)
    NPP_ann            <- apply(NPP_, c(1,2), mean)
    NPP_ann[mask == 0] <- NA 
    return(NPP_ann)
 }
 integT <- function(biofile, var = 'oPPt'){
-   dat <- integ(biofile, var)
+   dat <- vinteg(biofile, var)
    for (i in 1:dim(dat)[3]){
        dat[,,i] <- dat[,,i]/(pm*pn)
    }
@@ -78,7 +84,7 @@ integT <- function(biofile, var = 'oPPt'){
    dat <- dat/1E18    #Unit: PetagC y-1 = 10^15 gC y-1
    return(dat)
 }
-NPPI  <- integ(biofile)
+NPPI  <- vinteg(biofile)
 NPP.m <- NPPI
 vgpm  <- MASK(vgpm)
 cbpm  <- MASK(cbpm)
@@ -261,7 +267,6 @@ mtext('Longitude (ºE)',side=1, outer=T, adj=0.25)
 dev.off()
 
 #Another Taylorgram:
-stop('Pause')
 TNO3 <- data.frame(MOD=as.numeric(NO3a),OBS=as.numeric(NO3m_ann))
 TNO3 <- na.omit(TNO3)
 TCHL <- data.frame(MOD=as.numeric(CHL1),OBS=as.numeric(CHL2))
@@ -376,7 +381,6 @@ mtext('Latitude (ºN)', side=2, outer=T, cex=1.4)
 mtext('Longitude (ºE)',side=1, outer=T, adj=0.5,cex=1.4)
 dev.off()
 
-
 #Draw a separate figure with NPP only
 file2 <- paste0(nameit,'-mod-dat-NPP.pdf')
 pdf(file2,width=8, height=4,paper='a4')
@@ -422,3 +426,122 @@ mtext(Varname,adj=0, cex=1.2)
 mtext('Latitude (ºN)', side=2, cex=1.4,outer=T)
 mtext('Longitude (ºE)',side=1, cex=1.4,outer=T, adj=0.5)
 dev.off()
+
+#Calculate NPP from discrete model:
+vtr     <- c(0, 0.01, 0.03, 0.05, 0.07, 0.1)
+pre     <- '~/Roms_tools/Run/NPacS1_DIS_'
+biofile <- paste0(pre,vtr,'/','npacS_dbio_avg.nc')
+avgfile <- paste0(pre,vtr,'/','npacS_avg.nc')
+NPP     <- integT(biofile)
+
+#Obtain NO3, CHL, NPP from model files
+Mod_sur <- function(avgfile, biofile){
+   CHL    <- ncread(avgfile, 'CHL', 
+                    start = c(1,1,Nroms,NMo[1]),
+                    count = c(L,M,    1,length(NMo)))
+   CHL.m  <- MASK(CHL)
+   NO3    <- ncread(avgfile, 'NO3', 
+                    start = c(1,1,Nroms,NMo[1]),
+                    count = c(L,M,    1,length(NMo)))
+   NO3.m  <- MASK(NO3)
+   NPP.m  <- integann(biofile)
+   return(list(CHL=CHL.m, NO3=NO3.m, NPP=NPP.m))
+}
+
+dat1  <- Mod_sur(avgfile[4], biofile[4])
+file2 <- paste0(nameit,'-mod-dat-bulk-disc.pdf')
+pdf(file2,width=6, height=7,paper='a4')
+
+op <- par( font.lab  = 1,
+             family  ="serif",
+             mar     = c(2.5,3.5,2,2),
+             mgp     = c(2.3,1,0),
+             oma     = c(4,4,0,0),
+             pch     = 16,
+             cex.axis= 1.4,
+             cex.lab = 1.4,
+             cex     = 1.4,
+             mfrow   = c(3,2))
+
+image2D(NO3m_ann, Lon, Lat, 
+          col = jet.colors(18),   zlim = c(0,30), 
+         xaxt = 'n',frame = F,
+         xlab = "", ylab = "")
+axis(side=1, at = lon1, labels=lon2)
+mtext('Modeled NO3 (µM)',adj=0, cex=1.2)
+
+cff <- apply(dat1$NO3, c(1,2), mean)
+image2D(cff, Lon, Lat,  #Modeled NO3 from discrete models
+          col = jet.colors(18),   zlim = c(0,30), 
+         xaxt = 'n',frame = F,
+         xlab = "", ylab = "")
+axis(side=1, at = lon1, labels=lon2)
+mtext('WOA13 NO3 (µM)',adj=0,cex=1.2)
+
+CHLmax <- 2
+CHL1   <- apply(dat1$CHL, c(1,2), mean)
+CHL1[CHL1 > CHLmax] <- CHLmax
+image2D(CHL1, Lon, Lat,    #Model CHL
+          col = jet.colors(18),   zlim = c(0,CHLmax), 
+         xaxt = 'n',frame = F,
+         xlab = "", ylab = "")
+axis(side=1, at = lon1, labels=lon2)
+mtext('Modeled Chl (µg/L)',adj=0,cex=1.2)
+
+CHL2[CHL2 > CHLmax] <- CHLmax
+image2D(CHL2, Lon, Lat,    #Seawifs CHL
+          col = jet.colors(18),   zlim = c(0,CHLmax), 
+         xaxt = 'n',frame = F,
+         xlab = "", ylab = "")
+axis(side=1, at = lon1, labels=lon2)
+mtext('SeaWIFS Chl (µg/L)',adj=0,cex=1.2)
+
+#Calculate the pico fraction of each community:
+ESD2V   <- function(x) log(pi/6*x^3)
+PMU_max <- ESD2V(60)
+PMU_min <- ESD2V(.6)
+NPHY    <- 20L
+PMU_    <- seq(PMU_min, PMU_max, length.out=NPHY)
+cff     <- picof.m.ann
+image2D(cff, Lon, Lat, zlim =c(0,1),
+          col = jet.colors(18L), 
+         xaxt = 'n',frame = F,
+         xlab = "", ylab = "")
+axis(side=1, at = lon1, labels=lon2)
+Varname  <- "Modeled pico. fractions"
+mtext(Varname,adj=0,cex=1.2)
+
+cff <- picof.clm.ann
+image2D(cff, Lon, Lat, zlim =c(0,1),
+          col = jet.colors(18), 
+         xaxt = 'n',frame = F,
+         xlab = "", ylab = "")
+axis(side=1, at = lon1, labels=lon2)
+Varname  <- "Pico. fraction based on Ward (2015)"
+mtext(Varname,adj=0,cex=.8)
+
+cbpm.a[cbpm.a > NPPmax] <- NPPmax
+image2D(cbpm.a, Lon, Lat, zlim =c(0,NPPmax),
+          col = jet.colors(18), 
+         xaxt = 'n',frame = F,
+         xlab = "", ylab = "")
+axis(side=1, at = lon1, labels=lon2)
+Varname  <- bquote('NPP, cbpm (mg C '*m^-2*' '*d^-1*')')
+mtext(Varname,adj=0)
+
+NPP_ann <- apply(dat1$NPP, c(1,2), mean)
+NPP_ann[NPP_ann > NPPmax] <- NPPmax
+NPP_ann[,1]               <- NA
+image2D(NPP_ann, Lon, Lat, zlim =c(0,NPPmax),
+          col = jet.colors(18), 
+         xaxt = 'n',frame = F,
+         xlab = "", ylab = "")
+axis(side=1, at = lon1, labels=lon2)
+Varname  <- bquote('Modeled NPP (mg C '*m^-2*' '*d^-1*')')
+mtext(Varname,adj=0)
+
+mtext('Latitude (ºN)', side=2, outer=T, cex=1.4)
+mtext('Longitude (ºE)',side=1, outer=T, adj=0.5,cex=1.4)
+dev.off()
+
+
