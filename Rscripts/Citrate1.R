@@ -21,23 +21,14 @@ Hz      <- CFF$Hz
 Depth   <- CFF$depth
 Nroms   <- dim(Depth)[3]
 time    <- ncread(avgfile, 'time_step')
-time    <- time[1,]  #Time step from initialization (0 year, Jan 1)
+time    <- time[1, ] #Time step from initialization (0 year, Jan 1)
 dt      <- 1200      #a time step
 days    <- as.integer(time*dt/86400)
 year    <- days/365
-# ROMS avg. model data
-#Nf  <- system('ls npacific_avg_*.nc | wc -l')
-#pat = paste0(nameit,"_avg_*.nc")
-#f   = list.files(pattern = pat)
-#Calculate total N:
 
-NO3     <- ncread(avgfile, 'NO3')
-PHY     <- ncread(avgfile, 'PHYTO')
-ZOO     <- ncread(avgfile, 'ZOO')
-DET     <- ncread(avgfile, 'DET')
-DFe     <- ncread(avgfile, 'DFE')
-DETFe   <- ncread(avgfile, 'DETFe')
-
+#Get final year
+NMo     <- length(days)
+NMo     <- (NMo-11):NMo
 #Get mask:
 mask    <- ncread(avgfile,'mask_rho')
 NO3_s   <- get_sur('NO3_roms', file = avgfile, nameit = 'npacS')
@@ -45,6 +36,24 @@ Lon     <- NO3_s$Lon
 Lat     <- NO3_s$Lat
 L       <- length(Lon)
 M       <- length(Lat)
+
+# ROMS avg. model data
+#Nf  <- system('ls npacific_avg_*.nc | wc -l')
+#pat = paste0(nameit,"_avg_*.nc")
+#f   = list.files(pattern = pat)
+#Calculate total N:
+
+NO3     <- ncread(avgfile, 'NO3', 
+                  start = c(1,1,    1,NMo[1]),
+                  count = c(L,M,Nroms,length(NMo)))
+PHY     <- ncread(avgfile, 'PHYTO',
+                  start = c(1,1,    1,NMo[1]),
+                  count = c(L,M,Nroms,length(NMo)))
+ZOO     <- ncread(avgfile, 'ZOO')
+DET     <- ncread(avgfile, 'DET')
+DFe     <- ncread(avgfile, 'DFE')
+DETFe   <- ncread(avgfile, 'DETFe')
+
 source('~/Roms_tools/Rscripts/inventory.R')
 #Retrieve annual surface mean data:
 Sur_mean <- function(ncfile, VAR){
@@ -67,10 +76,6 @@ MASK <- function(dat){
    }
    return(dat)
 }
-
-#Get final year
-NMo     <- length(days)
-NMo     <- (NMo-11):NMo
 
 #Get surface DFe:
 DFe     <- DFe[,,Nroms,NMo]
