@@ -1,45 +1,71 @@
+#Load data from the 11th year with daily resolution
+TD      <- c(0,0.1)
+nameit  <- 'npacS'
+pfix2   <- paste0('/',nameit,'_dbio_avgD.nc')
+pfix1   <- paste0('/',nameit,'_avgD.nc')
+prefix  <- '~/Roms_tools/Run/NPacS1_'
+avgFs   <- paste0(prefix,TD,pfix1)
+bioFs   <- paste0(prefix,TD,pfix2)
+source('~/Roms_tools/Rscripts/growth.R')
+ND      <- 365
+NO3_    <- array(NA, dim = c(ND,2,2))
+TEMP    <- NO3_
+PHY_    <- NO3_
+Fer_    <- NO3_
+LNV_    <- NO3_
+VAR_    <- NO3_
+PAR_    <- NO3_
+ mu_    <- NO3_
+d2mu_   <- NO3_
+#Calculate optimal size:
+Optsize <- function(NO3, temp, Fe, PAR){
+   ESD  <- seq(0.59,60,0.01)
+   PMU_ <- log(pi/6*ESD**3)
+   r1   <- sapply(1:length(PMU_), 
+                  function(x)mu(PMU = PMU_[x], 
+                                PAR_= PAR, NO3 = NO3, temp = temp, Fe = Fe))
+   optsize <- ESD[which.max(r1)]
+   return(optsize)  #Unit: µm
+}
+OptESD <- matrix(NA, nr = ND, nc = 2)
 
-source('~/Roms_tools/Rscripts/get_roms_data.R')
+#Get different variables for two regions:
+for (i in 1:2){
+    for (j in 1:2){
+        avgfile <- avgFs[i]
+        biofile <- bioFs[i]
+        if (j == 1){         #Oligotrophic
+           dlon <- c(x1,x2)
+           dlat <- c(y1,y2)
+        }else if (j == 2){   #Mesotrophic
+           dlon <- c(X1,X2)
+           dlat <- c(Y1,Y2)
+        }
+        NO3_[,i,j] <- get_box('NO3',      avgfile, dlon, dlat)
+        TEMP[,i,j] <- get_box('temp',     avgfile, dlon, dlat)
+        PHY_[,i,j] <- get_box('PHYTO',    avgfile, dlon, dlat)
+        Fer_[,i,j] <- get_box('DFE',      avgfile, dlon, dlat)
+        LNV_[,i,j] <- get_box('LNV',      avgfile, dlon, dlat)
+        VAR_[,i,j] <- get_box('VAR',      avgfile, dlon, dlat)
+         mu_[,i,j] <- get_box('omuNet',   biofile, dlon, dlat)
+        PAR_[,i,j] <- get_box('oPAR',     biofile, dlon, dlat)
+       d2mu_[,i,j] <- get_box('od2mudl2', biofile, dlon, dlat)
 
-#Get NO3:
-NO3_A1 <- get_box('NO3_roms', avgfile,  c(x1,x2),c(y1,y2))
-NO3_A2 <- get_box('NO3_roms', avgfile2, c(x1,x2),c(y1,y2))
-NO3_A3 <- get_box('NO3_roms', avgfile3, c(x1,x2),c(y1,y2))
-NO3_B1 <- get_box('NO3_roms', avgfile,  c(X1,X2),c(Y1,Y2))
-NO3_B2 <- get_box('NO3_roms', avgfile2, c(X1,X2),c(Y1,Y2))
-NO3_B3 <- get_box('NO3_roms', avgfile3, c(X1,X2),c(Y1,Y2))
+      if (i == 1){
+         OptESD[,  j] <- sapply(1:ND,
+                             function(x)Optsize(NO3=NO3_[x,i,j],
+                                               temp=TEMP[x,i,j],
+                                               Fe  =Fer_[x,i,j],
+                                               PAR =PAR_[x,i,j]))
+      }
+    }
+}
 
-#Get mean size:
-L_A1 <- get_box('LNV', avgfile,  c(x1,x2),c(y1,y2))
-L_A2 <- get_box('LNV', avgfile2, c(x1,x2),c(y1,y2))
-L_A3 <- 3
-L_B1 <- get_box('LNV', avgfile,  c(X1,X2),c(Y1,Y2))
-L_B2 <- get_box('LNV', avgfile2, c(X1,X2),c(Y1,Y2))
-L_B3 <- L_A3
+LNV_   <- LNV_/PHY_
+VAR_   <- VAR_/PHY_ - LNV_^2
+LNV_   <- exp(LNV_ - log(10))
+LNV_   <- (LNV_*6/pi)**0.33333 
+muAvg_ <- mu_ + VAR_*d2mu_/2 
 
-#Get size diversity
-Var_A1 <- get_box('VAR', avgfile,  c(x1,x2),c(y1,y2))
-Var_A2 <- get_box('VAR', avgfile2, c(x1,x2),c(y1,y2))
-Var_B1 <- get_box('VAR', avgfile,  c(X1,X2),c(Y1,Y2))
-Var_B2 <- get_box('VAR', avgfile2, c(X1,X2),c(Y1,Y2))
 
-#Get  growth rate at the mean size:
-mu_A1 <- get_box('omuNet', bioFile,  c(x1,x2),c(y1,y2))
-mu_A2 <- get_box('omuNet', bioFile2, c(x1,x2),c(y1,y2))
-mu_B1 <- get_box('omuNet', bioFile,  c(X1,X2),c(Y1,Y2))
-mu_B2 <- get_box('omuNet', bioFile2, c(X1,X2),c(Y1,Y2))
-
-#Get d2mudl2
-d2mu_A1 <- get_box('od2mudl2', bioFile,  c(x1,x2),c(y1,y2))
-d2mu_A2 <- get_box('od2mudl2', bioFile2, c(x1,x2),c(y1,y2))
-d2mu_B1 <- get_box('od2mudl2', bioFile,  c(X1,X2),c(Y1,Y2))
-d2mu_B2 <- get_box('od2mudl2', bioFile2, c(X1,X2),c(Y1,Y2))
-
-#Calculate muAvg:
-muAvg_A1 <- mu_A1$dat + Var_A1$dat*d2mu_A1$dat/2 
-muAvg_A2 <- mu_A2$dat + Var_A2$dat*d2mu_A2$dat/2 
-muAvg_A3 <- get_box('omuNet', bioFile3, c(x1,x2),c(y1,y2))
-muAvg_B1 <- mu_B1$dat + Var_B1$dat*d2mu_B1$dat/2 
-muAvg_B2 <- mu_B2$dat + Var_B2$dat*d2mu_B2$dat/2 
-muAvg_B3 <- get_box('omuNet', bioFile3, c(X1,X2),c(Y1,Y2))
 
