@@ -1,4 +1,4 @@
-pdf('Timeseries_2box.pdf',width=6, height=10,paper='a4')
+pdf('FigS5_Timeseries_2box.pdf',width=6, height=10)
 op <- par( font.lab  = 1,
              family  ="serif",
              mgp     = c(2.3,1,0),
@@ -56,7 +56,7 @@ for (i in 1:2){
         xlab = '', 
         ylab = 'Mean size (µm)', type = 'l')
    points(mo, LNV_[,2,i], type = 'l', lty = 3, col=2)
-   points(mo, OptESD[,i], type = 'l', lty = 1, col=3)
+   #points(mo, OptESD[,i], type = 'l', lty = 1, col=3)
    ff <- ff+1
    mtext(paste0(letters[ff],') Mean size'), adj=0,cex=.8)
 

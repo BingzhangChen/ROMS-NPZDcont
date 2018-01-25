@@ -46,9 +46,8 @@ DrawRect <- function(x0, y0, x1, y1){
 #Draw the dynamics of mean trait values within these two boxes:
 #Only applicable for one-year nc file
 get_box <- function(Var, file, dLon, dLat){
+
     #dLon and dLat must be two end points defining the range
-    #NPP = readnc(Var, sourcefile = file)
-    dat <- ncread(file, Var)
 
     #Retrieve the final year
     time    <- ncread(file, 'time_step')
@@ -61,12 +60,12 @@ get_box <- function(Var, file, dLon, dLat){
     NMo     <- which.min(abs(year + 1 - year[length(year)]))
     NMo     <- NMo:length(year)
 
-    #Number of vertical layers:
-    #N   = dim(NPP$depth)[3]
+    #Nroms: Number of vertical layers
     
     #Plot surface NPP:
-    #dat = NPP$data[,,N,NMo]
-    dat          <- dat[,,Nroms,NMo]
+    dat <- ncread(file, Var, 
+                  start = c(1, 1, Nroms, NMo[1]), 
+                  count = c(L, M, 1,     length(NMo)))
     dat[mask==0] <- NA
     
     #Obtain the data:
@@ -74,9 +73,6 @@ get_box <- function(Var, file, dLon, dLat){
     Klat= which(Lat >= dLat[1] & Lat <= dLat[2])
      dat= dat[Klon,Klat,]
      dat= apply(dat, 3, function(x)mean(x,na.rm=T))
-     #days = sort(NPP$time)
-     #dat  = dat[order(NPP$time)]
-    #return(list(days=days,dat=dat))
      return(dat)
 }
 #Draw the dynamics of mean trait values within these two boxes (for HIGH RESOLUTION):

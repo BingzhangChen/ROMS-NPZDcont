@@ -6,8 +6,10 @@ dat_lim <- function(dat, ZLIM){
 library(MASS)
 #Calculate production log ratios between high and low diversity treatments:
 
-avgFiles  <- c(avgf_TD[1], avgf_TD[N])
-bioFiles  <- c(biof_TD[1], biof_TD[N])
+prefix    <- '~/Roms_tools/Run/NPacS1_'
+VTR       <- c(0, 0.1)
+avgFiles  <- paste0(prefix, VTR, '/npacS_avg.nc')
+bioFiles  <- paste0(prefix, VTR, '/npacS_dbio_avg.nc')
 NPP_H     <- integann(bioFiles[2])
 NPP_L     <- integann(bioFiles[1])
 NPP.dff   <- log(NPP_H/NPP_L)  #Difference between high and low diversity
@@ -49,7 +51,7 @@ f2   <- data.frame(x=as.numeric(muAvg.dff), y=as.numeric(NPP.dff))
 f2   <- na.omit(f2)
 f2   <- kde2d(f2$x, f2$y, n = 50, lims = c(-0.1, .1, -.1, .1))
 
-pdf('NPP_VAR_diff.pdf',width=6, height=4,paper='a4')
+pdf('FigS4_NPP_VAR_diff.pdf',width=6, height=4)
 op <- par( font.lab  = 1,
              family  ="serif",
              mar     = c(4,4,1.5,2),
@@ -57,13 +59,13 @@ op <- par( font.lab  = 1,
              cex.lab = 1.4,
              lwd     = 1.5,
              mfcol   = c(1,1),
-             cex.axis=1) 
+             cex.axis= 1) 
 
 image2D(NPP.dff, Lon, Lat, 
           col = jet.colors(18), # zlim = ZLIM,
          xaxt = 'n',frame = F,
          xlab = "Longitude (ºE)", ylab = "Latitude (ºN)")
-#DRAW()
+DRAW()
 #mtext('a) NPP log ratio of high vs. low diversity', adj=0, line = .5)
 lon1 = seq(100,280,by=20)
 lon2 = lon1

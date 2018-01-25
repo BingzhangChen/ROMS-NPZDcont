@@ -1,21 +1,22 @@
 #Load data from the 11th year with daily resolution
-TD    <- c(0,0.1)
-pfix2 <- paste0('/',nameit,'_dbio_avgD.nc')
-pfix1 <- paste0('/',nameit,'_avgD.nc')
-prefix<- '~/Roms_tools/Run/NPacS1_'
-avgFs <- paste0(prefix,TD,pfix1)
-bioFs <- paste0(prefix,TD,pfix2)
+TD      <- c(0,0.1)
+nameit  <- 'npacS'
+pfix2   <- paste0('/',nameit,'_dbio_avgD.nc')
+pfix1   <- paste0('/',nameit,'_avgD.nc')
+prefix  <- '~/Roms_tools/Run/NPacS1_'
+avgFs   <- paste0(prefix,TD,pfix1)
+bioFs   <- paste0(prefix,TD,pfix2)
 source('~/Roms_tools/Rscripts/growth.R')
-ND    <- 365
-NO3_  <- array(NA, dim = c(ND,2,2))
-TEMP  <- NO3_
-PHY_  <- NO3_
-Fer_  <- NO3_
-LNV_  <- NO3_
-VAR_  <- NO3_
-PAR_  <- NO3_
- mu_  <- NO3_
-d2mu_ <- NO3_
+ND      <- 365
+NO3_    <- array(NA, dim = c(ND,2,2))
+TEMP    <- NO3_
+PHY_    <- NO3_
+Fer_    <- NO3_
+LNV_    <- NO3_
+VAR_    <- NO3_
+PAR_    <- NO3_
+ mu_    <- NO3_
+d2mu_   <- NO3_
 #Calculate optimal size:
 Optsize <- function(NO3, temp, Fe, PAR){
    ESD  <- seq(0.59,60,0.01)
