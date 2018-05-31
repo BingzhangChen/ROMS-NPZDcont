@@ -23,9 +23,13 @@
 #elif defined SOLVE3D && defined BIOLOGY && defined BIO_PZEFT
 # include "bio_PZEFT_new.F"
 #elif defined SOLVE3D && defined BIOLOGY && defined PZEFTFE
-# include "bio_PZEFTFE.F"
+# ifdef CITRATE3
+#   include "bio_citrate3.F"
+# else
+#   include "bio_NPZDcontFe.F"
+# endif
 #elif defined SOLVE3D && defined BIOLOGY && defined BIO_NPZDDISC
-# include "bio_NPZDDisc.F"
+# include "bio_NPZDDISC.F"
 #elif defined SOLVE3D && defined BIOLOGY && defined BIO_EFTDISC
 # include "bio_EFTDisc.F"
 #else

@@ -638,3 +638,6 @@ mtext('Longitude (ºE)',side=1, outer=T, adj=0.5,cex=1.4)
 
 dev.off()
 
+#Plot vertical profiles of Chl:C
+Lon_HOT <- 
+

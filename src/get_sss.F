@@ -103,7 +103,9 @@
   1   i=3-itsss
        cff=time+0.5*dt
         if (sss_time(i).le.cff .and. cff.lt.sss_time(itsss)) return
+
         ierr=advance_cycle (sss_cycle, ntsss, sss_ncycle, sss_rec)
+
         if (ierr .ne. 0) goto 7                           !--> ERROR
 
         ierr=nf_get_var1_FTYPE (ncidfrc, sss_tid, sss_rec, cff)
@@ -188,6 +190,7 @@
 !# include "param.h"
 !# include "forces.h"
 # include "scalars.h"
+# include "grid.h"
 !
 # include "compute_extended_bounds.h"
 !
@@ -205,6 +208,12 @@
             do j=JstrR,JendR
               do i=IstrR,IendR
                 sss(i,j)=sssg(i,j,itsss)
+       if (lonr(i,j) .gt. -159 .and. lonr(i,j) .le. -157 
+     &    .and. latr(i,j) .gt. 22.5 .and. latr(i,j) .le. 24) then
+          write(stdout,*) 'SSS = ', sss(i,j)
+          write(stdout,*) 'SSS = ', sssg(i,j,itsss)
+       endif
+
 # if defined SFLX_CORR && !defined QCORRECTION
                 dqdt(i,j)=scldqdt*dqdtg(i,j,itsss)
 # endif

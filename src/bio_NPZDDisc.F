@@ -1,15 +1,18 @@
 #include "cppdefs.h"
 #if defined BIOLOGY && defined BIO_NPZDDISC
-
       SUBROUTINE biology_tile (Istr,Iend,Jstr,Jend)
 !
 ! Compute biological forcing functions
 !
-! In this particular implementation there are 23 state variables:
-! NO3, 20 PHYTOplankton size classes, ZOOplankton, DET
+! In this particular implementation there are 7 state variables:
+! NO3, Fe, PHYTOplankton (20 size classes), ZOOplankton, DET, DETFe
 !
-      USE forces, only: srflx
-      use bio_MOD
+      USE forces,     only: dust,srflx
+      USE NPZDCONTFE, only: thetamin,VTR,alphaG
+      USE NPZDCONTFE, only: dtdays,Fe_N,Femin,IRONCYCLE,MONOD_size
+      USE NPZDCONTFE, only: gmax,grazing,eps,WDET,TEMPBOL,mz
+      USE NPZDCONTFE, only: RDN,Ez,KP,grazing_formulation,Calculate_PAR
+
       implicit none
       integer Istr,Iend,Jstr,Jend,IMAX,JMAX,it
 #include "param.h"
@@ -18,45 +21,34 @@
 #include "ocean2d.h"
 #include "diagnostics.h"
 #include "scalars.h"
-!#include "forces.h"
 #include "mixing.h"
       integer, parameter :: nsink   = NumVSinkTerms
       real,    parameter :: kw      = 0.04, 
-     &                      kc      = 0.025, !Light attenuation of chlorophyll (mg Chl m-2)
-     &                      mon2sec = 2592D3,!How many seconds that one month contains
-     &                      eps     = 1D-20
+     &                      kc      = 0.025   !Light attenuation of chlorophyll (mg Chl m-2)
       real,    parameter :: d_per_s = 864d2   ! how many seconds in one day
       real :: ThisFlux(N, NumFluxTerms) = 0. ! [mmol m-2 s-1], upward flux is positive
       real :: muNet(NPHY) = 0.
-      real ::  Graz(NPHY) = 0.
-      real ::    SI(NPHY) = 0.
+      real ::    SI(NPHY) = 0., Fe_scav = 0.
+      real :: theta(NPHY), QN(NPHY),Graz(NPHY)
       real ::  Lno3(NPHY) = 0.
       real :: Temp(N), PAR(N), PARavg 
       real :: Hz_(N)  ! Vertical distance of local grid
 
-      integer i,j,k, iB, itrc, ii_, iflux, N_MLD
-      real NO3(N),PHY(N,NPHY),ZOO(N),CHL(N),DFE(N),
+      integer i,j,k, iB, itrc, l, iflux, N_MLD
+      real NO3(N),PHY(N,NPHY),ZOO(N),DFE(N),DETFe(N),CHL_(N),
      &     DET(N),FC(0:N),
-     &     I_0,I_min,
+     &     I_0,I_min,PHYtot,PHYC,CHLt,PHYtot2,
      &     SB(N,nsink),dSB(0:N,nsink),wSB(nsink),cff,cff1,cff2,cff6,
-     &     aR,aL,cu,tf_z,gbar,INGES,EGES,RES,ZMORT,pp_ND,pp_NZ,pp_DZ,
+     &     aR,aL,cu,tf_z,gbar,INGES,EGES,RES,Zmort,pp_ND,pp_NZ,pp_DZ,
      &     pp_ZP
 
-      real            :: par_,PHYtot, PHYtot2, pp_PN 
-      real            :: alphaG
-#if defined IRON && defined IRONCYCLE
-      real, parameter :: Dust_solubility = 0.02  !Aumont et al. (2003)
-     &                  ,Dust_ironfrac   = 0.035 !TOM10Appendix p. 24, unit: g/g
-#endif
-
-      real,    parameter :: GGE=0.3, unass  =0.24
-      real,    parameter :: Q0N=0.15,THETA  =0.24
-      logical            :: hel_found       = .FALSE.
+      real            :: par_,PP_PN,ppC_PN
+      real, parameter :: GGE=0.3, unass  = 0.24
+      logical         :: hel_found       = .FALSE., ALOHA = .FALSE.
 # include "compute_auxiliary_bounds.h"
 
      !the fraction of a time step in one day
       dtdays = dt/d_per_s
-
 ! Since the following solver is iterative to achieve implicit
 ! discretization of the biological interaction, two time slices are
 ! required, BIO where BIO is understood as vector of
@@ -128,22 +120,35 @@
                     endif
                   enddo
         NO3(k) =t(i,j,k,nnew,iNO3_)  ! Nitrate
-
-        do it = 1, NPHY
-           PHY(k,it) =t(i,j,k, nnew, iPHY1(it))  ! Phytoplankton
-        enddo
-
+      
         !Calculate total CHL:
-        CHL(k) =sum(PHY(k,:)) / Q0N * THETA
-
-        ZOO(k) =t(i,j,k,nnew,iZOO1)  ! Zooplankton
-        DET(k) =t(i,j,k,nnew,iDET1)  ! Detritus
-#if defined IRON && defined IRONCYCLE
-        DFE(k) =t(i,j,k,nnew,iFer1)  ! Dissolved iron
-#endif
-        Temp(k)=t(i,j,k,nnew,iTemp)  ! temperature; [deg. C]
+        do l=1,NPHY
+           PHY(k,l)=max(t(i,j,k,nnew,iPhy1(l)),eps)  ! Phytoplankton
+        enddo
+        ZOO(k)   =max(t(i,j,k,nnew,iZOO1),eps)  ! Zooplankton
+        DET(k)   =max(t(i,j,k,nnew,iDET1),eps)  ! Detritus
+        CHL_(k)  =max(CHL(i,j,k),eps)         ! CHL
+        DFE(k)   =max(t(i,j,k,nnew,iFer1),Femin)  ! Dissolved iron
+        DETFe(k) =max(t(i,j,k,nnew,iDETFe1),eps)  ! Detrital iron
+        Temp(k)  =t(i,j,k,nnew,iTemp)  ! temperature; [deg. C]
 
       enddo EXTRACT
+
+#  ifdef DEBUG_BIO2
+      ALOHA=.FALSE.
+      if (lonr(i,j) .gt. -159 .and. lonr(i,j) .le. -157 
+     &    .and. latr(i,j) .gt. 22.5 .and. latr(i,j) .le. 24) ALOHA=.TRUE.
+      if (ALOHA) then
+         write(6,112) 'NO3 = ',NO3(N)
+         write(6,112) 'DFE = ',DFE(N)
+         write(6,112) 'DETFe= ',DETFe(N)
+         write(6,112) 'CHL  = ',CHL_(N)
+         do l = 1, NPHY
+            write(6,112) 'PHY  = ',PHY(N,l)
+         enddo
+         write(6,112) 'Temp = ',Temp(N)
+      endif
+#  endif
 
 ! Calulate PAR: Set Photosynthetically Available Radiation (PAR) at
 ! surface from solar radiation x 0.43.
@@ -159,7 +164,8 @@
       ! Update vertical light level:
       ! Obtain local Hz:
       Hz_(:) = Hz(i,j,:)
-      call Calculate_PAR(I_0, N, Hz_, CHL, PAR)
+
+      call Calculate_PAR(I_0, N, Hz_, CHL_(:), PAR)
 
 #if defined LMD_SKPP || defined LMD_BKPP
       ! Calculate the vertical grid index (N_MLD) at the bottom of MLD:
@@ -173,23 +179,28 @@
       enddo 
       PARavg = PARavg/abs(Z_w(i,j,N_MLD-1))
 #endif
-
-#if defined IRON && defined IRONCYCLE
+!
+#if defined IRON
 ! Iron atmospheric deposition:
-! Dust deposition unit: kg/m2/month. Assume 0.035g Fe per g of dust
+! Dust deposition unit: kg/m2/s. 
 ! so need to convert into nM at each time step
-! Deposition = Dust*10^12*solubility*Fe%/56*dt/mon2sec*surface_area/surface_grid_volume/1000
-        DFE(N) = DFE(N)
-     &    + Dust_solubility*dust(i,j)*1D9*Dust_ironfrac/55.85
-     &    / z_r(i,j,N)/mon2sec*dt                     
+! Deposition = Dust*10^12/56*dt/surface_area/surface_grid_volume/1000
+      cff    = dust(i,j)*1D9/55.85/Hz_(N)*dt
+#ifdef DEBUG_BIO2
+      if (ALOHA) then
+         write(6,112) 'DFe before dust depo.', DFE(N)
+      endif
+#endif
+      DFE(N) = DFE(N) + cff
 
+#ifdef DEBUG_BIO2
+      if (ALOHA) then
+         write(6,112) 'DFe after dust depo.', DFE(N)
+      endif
 #endif
 
-      if (kill_the_winner) then
-         alphaG=1.1d0
-      else
-         alphaG=1d0
-      endif
+#endif
+      hel_found = .FALSE.
 
       DO k=N,1,-1     !<-- irreversible
 
@@ -203,87 +214,134 @@
 #else
         par_    = PAR(k)
 #endif
-
-        PHYtot  =0d0  ! Calculate total PHY biomass
+        PHYtot  =0d0  ! Calculate total PHY biomass (N)
+        PHYC    =0d0  ! Calculate total PHY biomass (C)
+        CHLt    =0d0  ! Calculate total Chl a
         PHYtot2 =0d0  ! total P**alphaG
-        pp_PN   =0d0  ! N-based NPP
-  
+        PP_PN   =0d0  ! N-based NPP
+        ppC_PN  =0d0  ! C-based NPP
       !! Phytoplankton section:
-        do ii_ = 1, NPHY
-      
-          call NPZDPhy_size(PMU_(ii_),NO3(k),Temp(k), par_, 
-     &            muNet(ii_), SI(ii_), Lno3(ii_))
-      
-          PHYtot  = PHYtot +PHY(k,ii_)
-          PHYtot2 = PHYtot2+PHY(k,ii_)**alphaG
-          pp_PN   = PHY(k, ii_)*muNet(ii_) + pp_PN
-        enddo
+       do l = 1, NPHY
 
-        ! save total NPP (carbon-based), units changed to d-1
-        ThisFlux(k,oPPt) = pp_PN/dtdays/Q0N
-!---------------------------------------------------------------
-        ! ZOOplankton section:
-          tf_z = TEMPBOL(Ez,Temp(k))
+         call MONOD_size(Temp(k),par_,NO3(k),DFE(k),PMU_(l),muNet(l),
+     &                    QN(l),theta(l),SI(l),Lno3(l))
 
-        ! The grazing dependence on total prey (dimensionless)
-          gbar = grazing(grazing_formulation,KP,PHYtot)
-        !Zooplankton total ingestion rate
-          INGES = tf_z*dtdays*GMAX*gbar
+#ifdef INFLEX
+         QN(l)   = 16./106.  !Fix N:C to redfield ratio
+#endif
+         PHYtot  = PHYtot  + PHY(k,l)
+         PHYtot2 = PHYtot2 + PHY(k,l)**alphaG
+         PHYC    = PHYC    + PHY(k,l)/QN(l)
+         CHLt    = CHLt    + PHY(k,l)/QN(l)*theta(l)
+         PP_PN   = PHY(k, l)*muNet(l)       + PP_PN
+         ppC_PN  = PHY(k, l)*muNet(l)/QN(l) + ppC_PN
+       enddo
 
-        !Zooplankton excretion rate (-> DOM)
-          RES  = INGES*(1d0-GGE-unass)
+       ! save total NPP (carbon-based), units changed to d-1
+       ThisFlux(k,oPPt)   = ppC_PN*12.
+       ThisFlux(k,oPAR)   = par_
+       ThisFlux(k,otheta) = CHLt/PHYC
+       Qbulk(i,j,k)       = PHYtot/PHYC
+       CHL(i,j,k)         = CHLt
 
-        !ZOOPLANKTON EGESTION (-> POM)
-          EGES = INGES*unass
-    
-        ! Grazing rate on PHY each size class (specific to N-based Phy biomass, unit: d-1) (Eq. 12)
-          ! Calculate the specific grazing rate for each size class
-          do ii_ = 1, NPHY
-           
-            ! Eq. 10 in Smith & Sergio
-            Graz(ii_) = (INGES*ZOO(k)/PHYtot2)*PHY(k,ii_)**(alphaG-1d0)
-            
-            PHY(k,ii_) = max( PHY(k,ii_)*(1d0+muNet(ii_))
-     &        /(1d0 + Graz(ii_)), eps)
-          enddo
-        !!End of zooplankton section
+#ifdef DEBUG_BIO2
+       if (ALOHA .and. k==N) then
+          write(6, 112) 'Primary production = ', ThisFlux(k,oPPt)
+          write(6, 112) 'Chl:C = ', ThisFlux(k,otheta)
+          write(6, 112) '  N:C = ', Qbulk(i,j,k)
+          write(6, 112) '  CHL = ', CHL(i,j,k)
+       endif
+#endif
+!      ZOOplankton section:
+       tf_z = TEMPBOL(Ez,Temp(k))
+         
+       ! The grazing dependence on total prey
+       gbar  = grazing(grazing_formulation,Kp,PHYtot)
+
+       !Zooplankton per capita total ingestion rate
+       INGES = tf_z*gmax*gbar
+
+       !Zooplankton excretion rate (-> DOM)
+       RES = INGES*(1D0-GGE-unass)
+
+       !ZOOPLANKTON EGESTION (-> POM)
+       EGES = INGES*unass
+
+!      !End of zooplankton section
 !=============================================================
-        !! Solve ODE functions:
-          Zmort = ZOO(k)**2*dtdays* MZ *tf_z  !Mortality term for ZOO
-         
-          ! For production/destruction matrix:
-          pp_ND = dtdays*RDN *DET(k)*tf_z   
-          pp_NZ = ZOO(k)*RES        
-          pp_DZ = ZOO(k)*EGES+Zmort 
-          pp_ZP = ZOO(k)*INGES      
+!! Solve ODE functions:
+       Zmort = ZOO(k)**2*mz*tf_z  !Mortality term for ZOO
+       PP_ZP = ZOO(k)*INGES      
 
-          DET(k)= (DET(k)+pp_DZ)/(1d0 + dtdays*RDN*tf_z)
-         
-          NO3(k)= (NO3(k)+pp_ND+pp_NZ)/(1d0+pp_PN/NO3(k))
-        
-          ZOO(k)= (ZOO(k)+pp_ZP)/(1d0
-     &          + EGES+ZOO(k)*dtdays*MZ*tf_z+RES)
-            
+
+       ! For production/destruction matrix:
+       PP_ND = RDN*DET(k)
+       PP_NZ = ZOO(k)*RES        
+       PP_DZ = ZOO(k)*EGES+Zmort 
+       DET(k)= DET(k) + dtdays*(PP_DZ         - PP_ND)
+       NO3(k)= NO3(k) + dtdays*(PP_ND + PP_NZ - PP_PN)
+
+       do l = 1, NPHY
+          ! Eq. 10 in Smith et al. (2016)
+          Graz(l) = (INGES*ZOO(k)/PHYtot2)*PHY(k,l)**(alphaG - 1d0)
+
+          !Add trait diffusion
+          if (l == 1) then
+             PHY(k,l)= PHY(k,l)*(1.+dtdays*(muNet(l)*(1.-VTR)-Graz(l)))
+     &               + PHY(k,l+1)*muNet(l+1)*dtdays*VTR        
+          elseif (l == NPHY) then
+             PHY(k,l)= PHY(k,l)*(1.+dtdays*(muNet(l)*(1.-VTR)-Graz(l)))
+     &               + PHY(k,l-1)*muNet(l-1)*dtdays*VTR        
+          else
+             PHY(k,l)= PHY(k,l)*(1. + dtdays
+     &               * (muNet(l)*(1.-2.*VTR)-Graz(l)))
+     &               + PHY(k,l-1)*muNet(l-1)*dtdays*VTR        
+     &               + PHY(k,l+1)*muNet(l+1)*dtdays*VTR        
+          endif
+       enddo
+       ZOO(k)= ZOO(k) + dtdays*(PP_ZP - PP_NZ - PP_DZ)
+
+#ifdef DEBUG_BIO2
+       if (ALOHA .and. k==N) then
+          write(6,112) 'Grazing rate = ', PP_ZP/PHYtot
+          do l = 1, NPHY
+            write(6,112) 'After calculation, PHY  = ',PHY(N,l)
+          enddo
+       endif
+#endif
+
+#ifdef IRON
+      ! Calculate dissolved Iron:    
+       call IRONCYCLE(Temp(k), DET(k),PP_NZ,PP_ND,PP_PN,PP_DZ,Fe_scav,
+     &                DETFe(k),DFE(k))
+#endif
+
 ! Calculate euphotic depth
-        if (.NOT. hel_found) then
+        IF (.NOT. hel_found) THEN
            if (PAR(k) < I_min) then
                hel(i,j)  = -z_w(i,j,k-1)
                hel_found = .TRUE.
            endif
-        endif
-
-      !  Qbulk(i,j,k)     = NPZ%p%QNavg
-      !  Thetabulk(i,j,k) = NPZ%p%ThetaAvg
-
+        ENDIF
       ENDDO
-! ---------------------------------------------------------------------------
-! ---------------------------------------------------------------------------
+
+#ifdef DEBUG_BIO2
+      if (ALOHA) then
+         do k=1,N
+            write(6,*) 'Before sinking'
+            write(6,112) 'DET   = ',DET(k)
+            write(6,112) 'DETFe = ',DETFe(k)
+         enddo
+      endif
+#endif
 ! Vertical sinking: Vertical advection algorithm based on monotonic,
 ! continuous conservative parabolic splines.
 ! 1: Put biological tracers into SB array.
       do k=1,N
         SB(k,1)=DET(k)
-        wSB(1) =WDET   ! Only detritus sink
+        SB(k,2)=DETFe(k)
+        wSB(1) =WDET*(0.3+0.03*TEMP(N))  ! Only detritus sink
+        wSB(2) =wSB(1)   ! Sinking rate of DETFe
       enddo
 
       do iB=1,nsink
@@ -299,8 +357,8 @@
 ! dSB: Vertical derivatives of fields SB at the grid box interfaces
 
           dSB(0,iB)=0d0
-          FC(0)=0d0
-          cff6=6d0
+          FC(0)    =0d0
+          cff6     =6d0
           do k=1,N-1
             cff=1d0/(2d0*Hz(i,j,k+1)+Hz(i,j,k)*(2d0-FC(k-1)))
             FC(k)=cff*Hz(i,j,k+1)
@@ -355,7 +413,6 @@
      &                                   -SB(k,iB) )*(1d0-2d0*cu))
           enddo
           dSB(N,iB)=0d0   ! Set no-flux boundary conditions at top.
-          dSB(0,iB)=0d0   ! Set no-flux boundary conditions at bottom.
 !
 ! Apply fluxes:
 
@@ -363,11 +420,20 @@
             SB(k,iB)=SB(k,iB)+wSB(iB)*FC(k)*(dSB(k,iB)-dSB(k-1,iB))
             SB(k,iB)=max(SB(k,iB),eps)  !Positivity
           enddo
+          if(iB==1) then
+            !The flux of DET sunk out of the water column
+            cu    =wSB(iB)*dtdays/Hz(i,j,1)*dSB(0,1)
+            !DET sunk out of the water column are replenished by NO3 immediately
+            NO3(1)=NO3(1)+cu
+            !DFe is replenished by DET times Fe/N ratio
+            DFE(1)=DFE(1)+cu*Fe_N*TEMPBOL(Ez, TEMP(1))
+          endif
         enddo  ! <-- iB
 
         
         do k=1,N
-          DET(k)=SB(k,1)    ! Register new DET
+          DET(k)  =SB(k,1)    ! Register new DET
+          DETFe(k)=SB(k,2)
         enddo
 
 #ifdef DIAGNOSTICS_BIO
@@ -378,19 +444,29 @@
           end do
         end do
 #endif
+
+#ifdef DEBUG_BIO2
+      if (ALOHA) then
+         do k=1,N
+            write(6,*) 'After sinking'
+            write(6,112) 'DET   = ',DET(k)
+            write(6,112) 'DETFe = ',DETFe(k)
+         enddo
+         stop
+      endif
+#endif
+
 !
 ! Write back the data into t array:
         do k=1,N
-          t(i,j,k,nnew,iNO3_)=max(NO3(k),eps)
-#if defined IRON && defined IRONCYCLE
-          t(i,j,k,nnew,iFer1)=max(DFE(k),Femin)
-#endif
-          do ii_=1,NPHY
-             t(i,j,k,nnew,iPhy1(ii_))=max(PHY(k,ii_),eps)
+          t(i,j,k,nnew,iNO3_)  = max(NO3(k),eps)
+          t(i,j,k,nnew,iFer1)  = max(DFE(k),Femin)
+          t(i,j,k,nnew,iDETFe1)= max(DETFe(k),eps)  ! Detrital iron
+          t(i,j,k,nnew,iZoo1)  = max(ZOO(k),eps)
+          t(i,j,k,nnew,iDET1)  = max(DET(k),eps)
+          do l=1,NPHY
+             t(i,j,k,nnew,iPhy1(l))=max(PHY(k,l),eps)
           enddo
-
-          t(i,j,k,nnew,iZoo1)=max(ZOO(k),eps)
-          t(i,j,k,nnew,iDET1)=max(DET(k),eps)
         enddo
       endif   ! <== The end of rmasking
 #endif /* MASKING */
@@ -406,6 +482,7 @@
      &                 1x,'at Depth',1x,F6.1)
 
  111     format('2(A6,F12.3)')       
+ 112     format(A10,2x, 1pe12.2)       
  1001    format('NO3=',1x,F6.2,1x,'PHY=',
      &                 1x,F6.2,1x,'ZOO=',
      &                 1x,F6.2,1x,'DFE=',

@@ -472,15 +472,15 @@ CR      write(*,*) 'wrt_avg:  srflx' MYID
 !     
 !     Write out Chlorophyll to Carbon ratio (m).
 !     
-#   ifdef BIO_PZEFT || defined PZEFTFE
+#   if (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
       if (wrtavg(indxQ)) then
          workr=Qbulk_avg
          call fillvalue3d(workr,ncidavg,avgQ,indxQ,
      &        record,r3dvar,type)
       endif
-      if (wrtavg(indxTheta)) then
-         workr=Thetabulk_avg
-         call fillvalue3d(workr,ncidavg,avgTheta,indxTheta,
+      if (wrtavg(indxCHL)) then
+         workr=CHL_avg
+         call fillvalue3d(workr,ncidavg,avgCHL,indxCHL,
      &        record,r3dvar,type)
       endif
 

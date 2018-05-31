@@ -320,7 +320,8 @@
 !
 ! Biology forcing: iron dust deposition. 
 !
-#if defined BIOLOGY && (defined PISCES || defined PZEFTFE)
+#if defined BIOLOGY && (defined PISCES || defined PZEFTFE \
+      || defined BIO_NPZDDISC)
       elseif (keyword(1:kwlen).eq.'biology') then
         call cancel_kwd (keyword(1:kwlen), ierr)
         read(input,'(A)',err=95) fname
@@ -744,9 +745,9 @@ c        close(testunit)
 #  elif defined BIO_BioEBUS
      &                                       ,  wrthis(indxAOU)
      &                                       ,  wrthis(indxWIND10)
-#  elif defined BIO_PZEFT || defined PZEFTFE
+#  elif (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
      &                                       , wrthis(indxQ)
-     &                                       , wrthis(indxTheta)
+     &                                       , wrthis(indxCHL)
 #  endif
 # endif
 
@@ -787,9 +788,9 @@ c        close(testunit)
 #  elif defined BIO_BioEBUS
      &                                      .or. wrthis(indxAOU)
      &                                      .or. wrthis(indxWIND10)
-#  elif defined BIO_PZEFT || defined PZEFTFE
+#  elif (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
      &                                      .or. wrthis(indxQ)
-     &                                      .or. wrthis(indxTheta)
+     &                                      .or. wrthis(indxCHL)
 #  endif
 # endif
      &     ) wrthis(indxTime)=.true.
@@ -846,11 +847,11 @@ c        close(testunit)
      &  , wrthis(indxAOU), 'write AOU ' 
      &  ,                       'Apparent Oxygen Utilization.'
      &  , wrthis(indxWIND10), 'write wind10 ', 'wind speed at 10 m.'  
-#  elif defined BIO_PZEFT || defined PZEFTFE
+#  elif (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
      &  , wrthis(indxQ),   'write Qbulk'
      &  ,                       'N:C ratio of the bulk phytoplankton'
-     &  , wrthis(indxTheta), 'write Thetabulk'
-     &  ,                       'Chl:C ratio of the bulk phytoplankton'
+     &  , wrthis(indxCHL), 'write CHL'
+     &  ,                       'Chl a concentration'
 #  endif
 # endif /* BIOLOGY */
      &  , wrthis(indxBostr), 'write Bostr', 'Bottom Stress.'
@@ -970,9 +971,9 @@ c        close(testunit)
 #   elif defined BIO_BioEBUS
      &                                       ,  wrtavg(indxAOU) 
      &                                       ,  wrtavg(indxWIND10)
-#   elif defined BIO_PZEFT || defined PZEFTFE
+#   elif (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
      &                                       , wrtavg(indxQ)
-     &                                       , wrtavg(indxTheta)
+     &                                       , wrtavg(indxCHL)
 #   endif
 #  endif /* BIOLOGY */
 
@@ -1004,9 +1005,9 @@ c        close(testunit)
 #  endif 
 #  if defined BIOLOGY && !defined PISCES
      &                                        .or. wrtavg(indxHel)
-#   if defined BIO_PZEFT || defined PZEFTFE
+#   if (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
      &                         .or. wrtavg(indxQ)
-     &                         .or. wrtavg(indxTheta)
+     &                         .or. wrtavg(indxCHL)
 #   elif defined BIO_NChlPZD
      &                                        .or. wrtavg(indxChC)
 #    ifdef OXYGEN
@@ -1058,11 +1059,11 @@ c        close(testunit)
 #  if defined BIOLOGY && !defined PISCES
      &  , wrtavg(indxHel),'write Hel  ',
      &                          'Depth of the euphotic layer'
-#   if defined BIO_PZEFT || defined PZEFTFE
+#   if (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
      &  , wrtavg(indxQ),'write Qbulk ',
      &                          'N:C ratio of the bulk phytoplankton'
-     &  , wrtavg(indxTheta),'write Thetabulk',
-     &                          'Chl:C ratio of bulk phytoplankton'
+     &  , wrtavg(indxCHL),'write CHL',
+     &                          'Chl a concentration'
 #   elif defined BIO_NChlPZD
      &  , wrtavg(indxChC),'write ChC  ',
      &                          'Chlorophyll to Carbon ratio'

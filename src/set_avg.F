@@ -1,14 +1,3 @@
-! $Id: set_avg.F 1458 2014-02-03 15:01:25Z gcambon $
-!
-!======================================================================
-! ROMS_AGRIF is a branch of ROMS developped at IRD and INRIA, in France
-! The two other branches from UCLA (Shchepetkin et al) 
-! and Rutgers University (Arango et al) are under MIT/X style license.
-! ROMS_AGRIF specific routines (nesting) are under CeCILL-C license.
-! 
-! ROMS_AGRIF website : http://www.romsagrif.org
-!======================================================================
-!
 #include "cppdefs.h"
 #ifdef AVERAGES
       subroutine set_avg (tile)
@@ -347,7 +336,7 @@ C$    integer omp_get_thread_num
           enddo
         endif
 
-#if defined BIOLOGY && defined PZEFTFE
+#if defined BIOLOGY && (defined PZEFTFE || defined BIO_NPZDDISC)
         if (wrtavg(indxdust_rsw)) then
           do j=JstrR,JendR
             do i=IstrR,IendR
@@ -495,24 +484,24 @@ C$    integer omp_get_thread_num
             enddo
           enddo
         endif
-#   ifdef BIO_PZEFT || defined PZEFTFE
+#   if (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
         if (wrtavg(indxQ)) then
           do k=1,N
             do j=JstrR,JendR
               do i=IstrR,IendR
                 Qbulk_avg(i,j,k)=cff*( cff1*Qbulk_avg(i,j,k)
-     &                                     +Qbulk(i,j,k)     )
+     &                                     +Qbulk(i,j,k)   )
               enddo
             enddo
           enddo
         endif
 
-        if (wrtavg(indxTheta)) then
+        if (wrtavg(indxCHL)) then
           do k=1,N
             do j=JstrR,JendR
               do i=IstrR,IendR
-                Thetabulk_avg(i,j,k)=cff*( cff1*Thetabulk_avg(i,j,k)
-     &                                     +Thetabulk(i,j,k)     )
+                CHL_avg(i,j,k)=cff*( cff1*CHL_avg(i,j,k)
+     &                                     +CHL(i,j,k)  )
               enddo
             enddo
           enddo
