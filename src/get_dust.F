@@ -1,5 +1,5 @@
 #include "cppdefs.h"
-#if defined BIOLOGY && defined PZEFTFE 
+#if defined BIOLOGY && (defined PZEFTFE || defined BIO_NPZDDISC)
 
                               ! Read point or grided 
       subroutine get_dust     ! Dust deposition data
@@ -92,7 +92,12 @@
         cff = time + 0.5*dt  ! The model time
 
         if (dust_time(i).le.cff .and. cff.lt.dust_time(itdust)) return
-        ierr = advance_cycle (dust_cycle,ntdust,dust_ncycle,dust_rec)
+        !MPI_master_only write(stdout,*) 'dust_cycle=', dust_cycle
+        !MPI_master_only write(stdout,*) 'dust_ncycle=', dust_ncycle
+        !MPI_master_only write(stdout,*) 'ntdust=', ntdust
+        !MPI_master_only write(stdout,*) 'dust_rec=', dust_rec
+        ierr = advance_cycle(dust_cycle,ntdust,dust_ncycle,dust_rec)
+
         if (ierr.ne.0) goto 7                           !--> ERROR
 
         !Read the dust_time data from the time record dust_rec into cff  
@@ -111,6 +116,7 @@
         if (ldustgrd .eq. 1) then
           ierr=nf_fread(dustg(START_2D_ARRAY,i), ncidfrc, dust_id,
      &                                             dust_rec, r2dvar)
+
         else
           ierr=nf_get_var1_FTYPE (ncidfrc,dust_id,dust_rec,dustp(i))
         endif
@@ -197,7 +203,7 @@
             do j = JstrR,JendR
               do i=IstrR,IendR
                 dust(i,j)    = dustg(i,j,itdust)
-              enddo
+               enddo
             enddo
           else
             dst  = dustp(itdust)
@@ -219,7 +225,7 @@
         cff  =  1./(cff1+cff2)
         cff1 =  cff1*cff
         cff2 =  cff2*cff
-        if (lsrfgrd.eq.1) then
+        if (ldustgrd.eq.1) then
           do j=JstrR,JendR
             do i=IstrR,IendR
               dust(i,j) = cff1*dustg(i,j,it1) + cff2*dustg(i,j,it2)

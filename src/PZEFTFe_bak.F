@@ -137,33 +137,13 @@
         normal = 1D0/sqrt(2D0*var*pi)*exp(-(l-mean)**2/var/2D0) 
         return
       end function normal
-!-----------------------------------------------------------------------------
-      subroutine MONOD_size(Temp,PAR,NO3,DFe,PMU,muNet,QN,theta,SI,Lno3)
-      real, intent(in)  :: Temp, PAR, NO3, PMU, DFe
-      real, intent(out) :: muNet,QN,  theta, SI,Lno3
-      real :: mu0hat, aI, KN, KFe
-
-      mu0hat = mu0a * exp(alphamu*PMU + betamu*PMU**2)
-
-      ! Initial slope of P-I curve
-      aI     = ScaleTrait(PMU, aI0_C, alphaI)
-      KN     = ScaleTrait(PMU, K0N, alphaK)
-      KFe    = ScaleTrait(PMU, K0Fe, alphaFe)
-
-      Call MONOD(Temp, PAR, NO3,DFe,KFe, mu0hat,
-     &            aI,  0d0, KN, muNet, QN,
-     &            theta, SI, Lno3)
-
-      return
-      end subroutine MONOD_size
-
-      subroutine MONOD(Temp, PAR, NO3, DFe, KFe, mu0_,aI0_,bI0_,
-     &                 KN, muNet, QN, theta, SI, Lno3)
+!--------------------------------------------------------------------------------------
+      subroutine MONOD(Temp, PAR, NO3, mu0_,aI0_,bI0_,KN, muNet, QN,
+     &                                                  theta, SI, Lno3)
       ! This subroutine calculate phytoplankton growth rates, QN and Theta based on the simplest MONOD equation
-      real, intent(in)  :: Temp, PAR, NO3,DFe, mu0_, aI0_,bI0_, KN
-      real, intent(in)  :: KFe
+      real, intent(in)  :: Temp, PAR, NO3, mu0_, aI0_,bI0_, KN
       real, intent(out) :: QN, theta, SI, Lno3,muNet
-      real              :: rmax_T, LFe
+      real              :: rmax_T
       
       ! The maximal growth rate (rmax_T) under temperature tC 
        rmax_T = mu0_*TEMPBOL(Ep,Temp)
@@ -171,19 +151,15 @@
       !The light limitation index (SI)
       ! Unit of aI0_C: (W m-2)-1, different from other models (aI0_Chl)
       ! Include photoinhibition (Platt et al. J Phycol 1980)
-      SI = (1. - exp(-aI0_*PAR/rmax_T))*exp(-bI0_*PAR/rmax_T)
+      SI = (1d0 - exp(-aI0_*PAR/rmax_T))*exp(-bI0_*PAR/rmax_T)
       
        ! Growth rate (d-1) is the product function of temperature, light, and nutrient   
        Lno3  = NO3/(NO3 + KN)
-       LFe   = DFe/(DFe + KFe)
-
-       if (LFe .le. Lno3) Lno3=LFe
-
        muNet = rmax_T*Lno3*SI
-       QN    = Qmin/(1. - (1. - Qmin/Qmax)*Lno3)
+       QN    = Qmin/(1d0-(1d0-Qmin/Qmax)*NO3/(NO3+Kn))
       theta  = thetamin+muNet/PAR/aI0_*(thetamax-thetamin)   !Unit: gChl/molC
       return
-      end subroutine MONOD
+      end subroutine
 
       ! The subroutine for phytoplankton with three traits (size L,
       ! light log Iopt, Temp Topt

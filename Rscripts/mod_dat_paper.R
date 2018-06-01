@@ -147,8 +147,8 @@ nanof.m.ann[,1] <- NA
 microf.m.ann[,1]<- NA
 
 mod_dat_file <- paste0(nameit,'-mod-dat-paper.pdf')
-pdf(mod_dat_file,width=6, height=11,paper='a4')
 
+pdf(mod_dat_file,width=6, height=11,paper='a4')
 op <- par( font.lab  = 1,
              family  ="serif",
              mar     = c(2.5,3.5,2,2),
@@ -427,12 +427,37 @@ mtext('Latitude (ºN)', side=2, cex=1.4,outer=T)
 mtext('Longitude (ºE)',side=1, cex=1.4,outer=T, adj=0.5)
 dev.off()
 
+#=====================================
 #Calculate NPP from discrete model:
-vtr     <- c(0, 0.01, 0.03, 0.05, 0.07, 0.1)
-pre     <- '~/Roms_tools/Run/NPacS1_DIS_'
-biofile <- paste0(pre,vtr,'/','npacS_dbio_avg.nc')
-avgfile <- paste0(pre,vtr,'/','npacS_avg.nc')
-NPP     <- integT(biofile)
+vtr      <- c(0, 0.01, 0.03, 0.05, 0.07, 0.1)
+KTW      <- c(0, 0.01, 0.03, 0.05, 0.07, 0.1)
+pre      <- '~/Roms_tools/Run/NPacS1_DIS_'
+preKTW   <- '~/Roms_tools/Run/NPacS1_DIS_KTW_'
+biofile  <- paste0(pre,vtr,'/','npacS_dbio_avg.nc')
+avgfile  <- paste0(pre,vtr,'/','npacS_avg.nc')
+biof_KTW <- paste0(preKTW,KTW,'/','npacS_dbio_avg.nc')
+avgf_KTW <- paste0(preKTW,KTW,'/','npacS_avg.nc')
+biof_KTW[1] <- biofile[1]
+avgf_KTW[1] <- avgfile[1]
+
+system.time(NPP_VTR  <- sapply(1:length(vtr), function(i)integT(biofile[i])))
+
+system.time(NPP_KTW  <- sapply(1:length(KTW), function(i)integT(biof_KTW[i])))
+
+pdf('TNPP_VTR_DISC.pdf',width=5, height=5,paper = 'a4')
+op <- par( font.lab  = 1,
+             family  ="serif",
+             mar     = c(4,4,1,1),
+             mgp     = c(2.3,1,0),
+             cex.lab = 1.2,
+             mfrow   = c(1,1)  )
+plot(vtr, NPP_VTR, type = 'b',
+     xlab = 'Coefficient of TD or KTW',
+     ylab = bquote('Annual primary production ('*'PgC '*y^-1*')'))
+points(KTW,NPP_KTW, type = 'b', pch=2)
+legend('topright', legend = c('TD', 'KTW'), pch=1:2)
+dev.off()
+
 
 #Obtain NO3, CHL, NPP from model files
 Mod_sur <- function(avgfile, biofile){
@@ -502,7 +527,25 @@ PMU_max <- ESD2V(60)
 PMU_min <- ESD2V(.6)
 NPHY    <- 20L
 PMU_    <- seq(PMU_min, PMU_max, length.out=NPHY)
-cff     <- picof.m.ann
+ip      <- which(PMU_ <= ESD2V(2))
+
+#Read PHYTO from surface:
+PHY_res <- function(avgfile){
+    Y   <- array(, c(L, M, length(NMo), NPHY))
+    for (i in 1:NPHY){
+        vname   <- paste0('PHYTO', i)
+        Y[,,,i] <- ncread(avgfile, vname,
+                        start = c(1,1,Nroms, NMo[1]),
+                        count = c(L,M,1,     length(NMo)))
+    }
+    PHYt <- apply(Y, c(1,2,3), sum)
+    pico <- Y[,,,ip]
+    pico <- apply(pico,c(1,2,3),sum)/PHYt
+    return(list(PHY = PHYt, pico=pico))
+}
+
+pico1   <- PHY_res(avgfile[4])$pico
+cff     <- apply(pico1, c(1,2), mean)
 image2D(cff, Lon, Lat, zlim =c(0,1),
           col = jet.colors(18L), 
          xaxt = 'n',frame = F,
@@ -544,4 +587,57 @@ mtext('Latitude (ºN)', side=2, outer=T, cex=1.4)
 mtext('Longitude (ºE)',side=1, outer=T, adj=0.5,cex=1.4)
 dev.off()
 
+#Compare discrete models with and without flexibility
+
+#Fixed N:C ratio
+setwd('~/Roms_tools/Run/NPacS1_DIS_KTW_0.1')
+biof1 <- '~/Roms_tools/Run/NPacS1_DIS_KTW_0.1_INFLEX/npacS_dbio_avg.nc'
+
+#Flexible N:C ratio
+biof2 <- '~/Roms_tools/Run/NPacS1_DIS_KTW_0.1/npacS_dbio_avg.nc'
+
+NPP1  <- integann(biof1)
+NPP2  <- integann(biof2)
+
+NPP_  <- list(NPP1 = NPP1, NPP2 = NPP2)
+N     <- length(NPP_)
+
+pdf('Compare_flex.pdf',width=6, height=7,paper='a4')
+
+op <- par( font.lab  = 1,
+             family  ="serif",
+             mar     = c(2.5,3.5,2,3),
+             mgp     = c(2.3,1,0),
+             oma     = c(4,4,0,0),
+             pch     = 16,
+             cex.axis= 1.2,
+             cex.lab = 1.2,
+             cex     = 1.2,
+             mfrow   = c(2,1))
+
+   NPPmax <- 1200
+   for (i in 1:N){
+     cff <- NPP_[[i]]
+     cff[cff > NPPmax] <- NPPmax
+     cff[,1]           <- NA
+     image2D(cff, Lon, Lat, zlim =c(0,NPPmax),
+               col = jet.colors(18), 
+              xaxt = 'n',frame = F,
+              xlab = "", ylab = "")
+     axis(side=1, at = lon1, labels=lon2)
+     if (i == 1){
+       Varname  <- bquote('Modeled NPP without flexibility (mg C '*m^-2*' '*d^-1*')')
+     }else{
+       Varname  <- bquote('Modeled NPP with flexibility (mg C '*m^-2*' '*d^-1*')')
+     }
+     mtext(Varname,adj=0)
+   }
+
+mtext('Latitude (ºN)', side=2, outer=T, cex=1.4)
+mtext('Longitude (ºE)',side=1, outer=T, adj=0.5,cex=1.4)
+
+dev.off()
+
+#Plot vertical profiles of Chl:C
+Lon_HOT <- 
 

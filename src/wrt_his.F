@@ -793,16 +793,16 @@ CR      write(*,*) 'wrt_his:  stflx(:,:,isalt)' MYID
 !     
 !     Write out depth of the euphotic layer (m).
 !     
-#  if defined BIO_PZEFT || defined PZEFTFE
+#  if (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
       if (wrthis(indxQ)) then
          workr=Qbulk
          call fillvalue3d(workr,ncidhis,hisQ,indxQ,
      &        record,r3dvar,type)
       endif
 
-      if (wrthis(indxTheta)) then
-         workr=Thetabulk
-         call fillvalue3d(workr,ncidhis,hisTheta,indxTheta,
+      if (wrthis(indxCHL)) then
+         workr=CHL
+         call fillvalue3d(workr,ncidhis,hisCHL,indxCHL,
      &        record,r3dvar,type)
       endif
 

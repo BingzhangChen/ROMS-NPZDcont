@@ -1122,7 +1122,6 @@ ccc          dvde = 0.5*( vrhs(i,j-1)-vrhs(i,j+1) )
 !#ifdef DEBUG_BIO2
 !        if (cff .ne. cff) then
 !           write(*,*) 'cff is NaN!'
-!           write(*,*) 'rufrc(i,j) =',rufrc(i,j)
 !           write(*,*) 'rubar(i,j) =',rubar(i,j)
 !           stop
 !        endif
@@ -1139,6 +1138,12 @@ ccc          dvde = 0.5*( vrhs(i,j-1)-vrhs(i,j+1) )
             cff=rvfrc(i,j)-rvbar(i,j)
             rvfrc(i,j)=cff1*cff + cff2*rvfrc_bak(i,j,3-nstp)
      &                          + cff3*rvfrc_bak(i,j,nstp)
+           !if (rvfrc(i,j) > 1D14) then
+           !  write(stdout,*) 'rvfrc-rvbar =',cff
+           !  write(stdout,*) 'rvfrc_bak =',rvfrc_bak(i,j,3-nstp)
+           !  write(stdout,*) 'rvfrc_bak2=',rvfrc_bak(i,j,nstp)
+           !  stop
+           !endif
             rvfrc_bak(i,j,nstp)=cff
           enddo
         enddo
@@ -1314,6 +1319,15 @@ ccc          dvde = 0.5*( vrhs(i,j-1)-vrhs(i,j+1) )
 #ifdef MASKING
      &                                         *vmask(i,j)
 #endif
+       !if (DVnew > 1D5) then
+       !   write(stdout,*) 'vbar(i,j,kstp)=',vbar(i,j,kstp)
+       !   write(stdout,*) 'rvfrc(i,j) =',rvfrc(i,j)
+       !   write(stdout,*) 'rvbar(i,j) =',rvbar(i,j)
+       !   write(stdout,*) 'Dstp(i,j)  =',Dstp(i,j)
+       !   write(stdout,*) 'Dstp(i,j-1)=',Dstp(i,j-1)
+       !   stop
+       !endif
+
 #ifdef WET_DRY
           cff1_WD=ABS(ABS(vmask_wet(i,j))-1.)
           cff2_WD=0.5+SIGN(0.5,DVnew)*vmask_wet(i,j)
@@ -1718,6 +1732,7 @@ C$OMP END MASTER
 !
       VMAXL=100.
       VMAX=0.
+      
       do j=JstrV,Jend
         do i=Istr,Iend
           IF(ABS(vbar(i,j,knew)).GE.VMAX) THEN

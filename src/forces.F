@@ -289,7 +289,7 @@
 # endif /* !ANA_SRFLUX */
 #endif /* SOLVE3D */
 
-#if defined BIOLOGY && defined PZEFTFE
+#if defined BIOLOGY && (defined PZEFTFE || defined BIO_NPZDDISC)
 !
 !  Atmospheric Dust deposition FLUX.
 !--------------------------------------------------------------------

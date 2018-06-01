@@ -21,14 +21,8 @@
       real :: ThetaHat
       real :: larg1, W_Y
       real,  parameter :: Qs=0.038   !0.076/2, half of minimal N:C ratio
-      real,  parameter :: alphamu = 0.1D0
-      real,  parameter ::  betamu = 0.0D0
-      real,  parameter :: mu0     = 5D0
-      real,  parameter :: KN0     = 1D0
-      real,  parameter :: A0NMAX  = 0.95
-      real,  parameter :: alphaKN = 0.3D0
-      real,  parameter :: alphaA  = 0.3D0
-      real,  parameter :: aI0     = 0.2D0
+      real,  parameter :: A0NMAX  = 0.95,  aI0 = 0.06, KN0  = 0.2
+      real,  parameter :: alphaA  = 0.3D0, mu0 = 5, alphaKN = 0.27
       !-----------------------------------------------------------------------
       !Warning: All rates should be multiplied by dtdays to get the real rate
       tf_p    = TEMPBOL(Ep,tC)

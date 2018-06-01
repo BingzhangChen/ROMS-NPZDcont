@@ -269,7 +269,7 @@ c     goto 99                                     !--> ERROR
                 write(stdout,3) 'nh4_time', bry_file(1:lstr)
 c     goto 99                                     !--> ERROR
               endif
-# elif defined BIO_NPZDDISC || defined BIO_EFTDISC
+# elif (defined BIO_NPZDDISC || defined BIO_EFTDISC || defined PZEFTFE)
             elseif (itrc.eq.iNO3_) then
               got_tbry(itrc)=.true.
               ierr=nf_inq_varid (bry_id, 'no3_time', bry_tid(itrc))
@@ -279,9 +279,19 @@ c     goto 99                                     !--> ERROR
                 write(stdout,3) 'NO3', bry_file(1:lstr)
 c              goto 99                                     !--> ERROR
               endif
+            elseif (itrc.eq.iFer1) then
+              got_tbry(itrc)=.true.
+              ierr=nf_inq_varid (bry_id, 'DFE_time', bry_tid(itrc))
+             ! ierr_all=ierr_all+ierr
+              if (ierr .ne. nf_noerr) then
+                got_tbry(itrc)=.false.
+                write(stdout,3) 'Fer', bry_file(1:lstr)
+c              goto 99                                     !--> ERROR
+              endif
+
             elseif (itrc.eq.iZoo1) then
               got_tbry(itrc)=.true.
-              ierr=nf_inq_varid (bry_id, 'zoo_time', bry_tid(itrc))
+              ierr=nf_inq_varid (bry_id, 'ZOO_time', bry_tid(itrc))
             !  ierr_all=ierr_all+ierr
               if (ierr .ne. nf_noerr) then
                 got_tbry(itrc)=.false.
@@ -290,27 +300,64 @@ c              goto 99                                     !--> ERROR
               endif
             elseif (itrc.eq.iDet1) then
               got_tbry(itrc)=.true.
-              ierr=nf_inq_varid (bry_id, 'det_time', bry_tid(itrc))
+              ierr=nf_inq_varid (bry_id, 'DET_time', bry_tid(itrc))
              ! ierr_all=ierr_all+ierr
               if (ierr .ne. nf_noerr) then
                 got_tbry(itrc)=.false.
                 write(stdout,3) 'DET', bry_file(1:lstr)
 c              goto 99                                     !--> ERROR
               endif
-            ! Start inquiring PHY status:
-            elseif (itrc.eq.iPhy1(1)) then
-              do i = 1, NPHY
-                 got_tbry(itrc+i-1)=.true.
-              enddo
+            elseif (itrc.eq.iDETFe1) then
+              got_tbry(itrc)=.true.
+              ierr=nf_inq_varid (bry_id, 'DET_time', bry_tid(itrc))
+             ! ierr_all=ierr_all+ierr
+              if (ierr .ne. nf_noerr) then
+                got_tbry(itrc)=.false.
+                write(stdout,3) 'DETFe', bry_file(1:lstr)
+c              goto 99                                     !--> ERROR
+              endif
+
+#    ifdef PZEFTFE
+             elseif (itrc.eq.iPhy1) then
+              got_tbry(itrc)=.true.
               ierr=nf_inq_varid (bry_id, 'phyto_time', bry_tid(itrc))
              ! ierr_all=ierr_all+ierr
               if (ierr .ne. nf_noerr) then
-                 do i = 1, NPHY
-                   got_tbry(itrc+i-1)=.false.
-                 enddo
+                 got_tbry(itrc)=.false.
                  write(stdout,3) 'PHYTO', bry_file(1:lstr)
 c              goto 99                                     !--> ERROR
               endif
+             elseif (itrc.eq.iPmu1) then
+              got_tbry(itrc)=.true.
+              ierr=nf_inq_varid (bry_id, 'pmu_time', bry_tid(itrc))
+             ! ierr_all=ierr_all+ierr
+              if (ierr .ne. nf_noerr) then
+                 got_tbry(itrc)=.false.
+                 write(stdout,3) 'LNV', bry_file(1:lstr)
+c              goto 99                                     !--> ERROR
+              endif
+             elseif (itrc.eq.iVar1) then
+              got_tbry(itrc)=.true.
+              ierr=nf_inq_varid (bry_id, 'var_time', bry_tid(itrc))
+             ! ierr_all=ierr_all+ierr
+              if (ierr .ne. nf_noerr) then
+                 got_tbry(itrc)=.false.
+                 write(stdout,3) 'VAR', bry_file(1:lstr)
+c              goto 99                                     !--> ERROR
+              endif
+
+#    else
+            ! Start inquiring PHY status:
+            elseif (itrc.ge.iPhy1(1) .or. itrc.le.iPhy1(NPHY)) then
+              got_tbry(itrc)=.true.
+              ierr=nf_inq_varid (bry_id, 'phyto_time', bry_tid(itrc))
+             ! ierr_all=ierr_all+ierr
+              if (ierr .ne. nf_noerr) then
+                 got_tbry(itrc)=.false.
+                 write(stdout,3) 'PHYTO', bry_file(1:lstr)
+c              goto 99                                     !--> ERROR
+              endif
+#    endif
 # elif (defined BIO_NChlPZD || defined BIO_N2ChlPZD2 || defined BIO_PZEFT || defined BIO_FLEX)
 ! Does not read in the boundary data for PMU and VAR in BIO_PZEFT. 
 ! So got_tbry(itrc) = .false.
@@ -727,11 +774,6 @@ c                goto 99         !--> ERROR
 # include "boundary.h"
 !
 # include "compute_extended_bounds.h"
-
-#ifdef VERBOSE
-      MPI_master_only write(stdout,*) 
-     & "Set up biology boundary forcing fields..."
-#endif
 
       do itrc=3,NT
         if(got_tbry(itrc)) then

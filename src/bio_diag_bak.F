@@ -130,7 +130,7 @@ C$OMP CRITICAL (bio_cr_rgn)
 #  endif
    1          format(1x,A4,3x,A10,1x,A10,4x,A10,4x,A10,4x,A10,3x,A3)
 
-# elif (defined BIO_NPZDDISC || defined BIO_EFTDISC)
+# elif defined BIO_NPZDDISC || defined BIO_EFTDISC
               write(stdout,1) 'STEP','time[DAYS]','       NO3',
      &                   '     PHYTO','       ZOO','    DETRIT',
      &                   'trd'
@@ -227,7 +227,7 @@ C$OMP CRITICAL (bio_cr_rgn)
      &                    , trd
    2        format(I6, F12.5, 4(1PE14.7), I3)
 
-# elif (defined BIO_NPZDDISC || defined BIO_EFTDISC)
+# elif defined BIO_NPZDDISC || defined BIO_EFTDISC
             write(stdout,2) iic-1,tdays, 
      &                      global_sum(2*iNO3_),  
      &                 sum( global_sum(2*iPhy1(:))), 

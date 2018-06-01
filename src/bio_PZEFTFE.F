@@ -1,13 +1,23 @@
+! $Id: bio_PZEFT.F 1458 2015-04-30 15:01:25Z bzchen $
+!======================================================================
+! ROMS_AGRIF is a branch of ROMS developped at IRD and INRIA, in France
+! The two other branches from UCLA (Shchepetkin et al) 
+! and Rutgers University (Arango et al) are under MIT/X style license.
+! ROMS_AGRIF specific routines (nesting) are under CeCILL-C license.
+! 
+! ROMS_AGRIF website : http://www.romsagrif.org
+!======================================================================
+!
 #include "cppdefs.h"
 #if defined BIOLOGY && defined PZEFTFE
 
       SUBROUTINE biology_tile (Istr,Iend,Jstr,Jend)
-      USE PZEFTFe
+      USE NPZZDEFTFE
 !
 ! Compute biological forcing functions
 !
 ! In this particular implementation there are 7 state variables:
-! NO3, Fe, PHYTOplankton, ZOOplankton, DET, Mean size, and variance.
+! NO3, Fe, PHYTOplankton, MicroZOOplankton, Mesozoo,DON, PON, Mean size, and variance.
 !
       implicit none
       integer Istr,Iend,Jstr,Jend,IMAX,JMAX,it
@@ -19,6 +29,7 @@
 #include "scalars.h"
 #include "forces.h"
 #include "mixing.h"
+      type(NPZZDFe)      :: NPZ
       integer, parameter :: ITERMAX = 1,   ! number of small implicit time step
      &                      nsink   = NumVSinkTerms
       real,    parameter :: kw      = 0.04, 

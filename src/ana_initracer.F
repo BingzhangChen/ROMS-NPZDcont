@@ -10,7 +10,7 @@ C$    integer omp_get_thread_num
       return
       end
 
-      subroutine ana_initracer_tile (Istr,Iend,Jstr,Jend)
+      subroutine ana_initracer_tile(Istr,Iend,Jstr,Jend)
 #ifdef SST_SKIN
 !# include "forces.h"
       use forces
@@ -23,7 +23,9 @@ C$    integer omp_get_thread_num
 !--------------------------------------------------------------------
 !
       implicit none
-#include "param.h"
+#ifndef SST_SKIN
+#  include "param.h"
+#endif
 #include "grid.h"
 #include "ocean2d.h"
 #include "ocean3d.h"
@@ -281,10 +283,6 @@ c              if (h(i,j).lt.300) then
 #    endif
 
 #   elif defined PZEFTFE
-            if (.not.got_tini(iChla)) then
-               t(i,j,k,1,iChla)=0.08
-               t(i,j,k,2,iChla)=t(i,j,k,1,iChla)
-            endif
             if (.not.got_tini(iPhy1)) then
                t(i,j,k,1,iPhy1)=0.1
                t(i,j,k,2,iPhy1)=t(i,j,k,1,iPhy1)
@@ -293,32 +291,21 @@ c              if (h(i,j).lt.300) then
                t(i,j,k,1,iZoo1)=0.06
                t(i,j,k,2,iZoo1)=t(i,j,k,1,iZoo1)
             endif
-            if (.not.got_tini(iZoo2)) then
-               t(i,j,k,1,iZoo2)=0.03
-               t(i,j,k,2,iZoo2)=t(i,j,k,1,iZoo1)
+            if (.not.got_tini(iDET1)) then
+               t(i,j,k,1,iDET1)=0.02
+               t(i,j,k,2,iDET1)=t(i,j,k,1,iDET1)
             endif
-
-            if (.not.got_tini(iDON1)) then
-               t(i,j,k,1,iDON1)=0.02
-               t(i,j,k,2,iDON1)=t(i,j,k,1,iDON1)
-            endif
-            if (.not.got_tini(iPON1)) then
-               t(i,j,k,1,iPON1)=0.02
-               t(i,j,k,2,iPON1)=t(i,j,k,1,iPON1)
-            endif
-
             if (.not.got_tini(iPmu1)) then
                t(i,j,k,1,iPmu1)=3.0
                t(i,j,k,2,iPmu1)=t(i,j,k,1,iPmu1)
             endif
-
             if (.not.got_tini(iVar1)) then
                t(i,j,k,1,iVar1)=0.02
                t(i,j,k,2,iVar1)=t(i,j,k,1,iVar1)
             endif
             if (.not.got_tini(iFer1)) then
                t(i,j,k,1,iFer1)=0.1
-               t(i,j,k,2,iFer1)=t(i,j,k,1,iVar1)
+               t(i,j,k,2,iFer1)=t(i,j,k,1,iFer1)
             endif
 
 #   elif defined BIO_FLEX
@@ -343,7 +330,6 @@ c              if (h(i,j).lt.300) then
 
 #   elif defined BIO_NPZDDISC || defined BIO_EFTDISC
             do ii = 1, NPHY
-
               if (.not.got_tini(iPHY1(ii))) then
                  t(i,j,k,1,iPhy1(ii))=0.1/float(NPHY)
                  t(i,j,k,2,iPhy1(ii))=t(i,j,k,1,iPhy1(ii))

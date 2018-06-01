@@ -133,7 +133,7 @@
 !---------------------------------------------------------------
 ! Atmospheric dust deposition flux [kg/m2/month]
 ! ---------------------------------------------------------------
-#if defined BIOLOGY && defined PZEFTFE
+#if defined BIOLOGY && (defined PZEFTFE || defined BIO_NPZDDISC)
       call get_dust
 #endif
       return
@@ -248,7 +248,6 @@
       call set_uwnd_tile(Istr,Iend,Jstr,Jend)
       call set_vwnd_tile(Istr,Iend,Jstr,Jend)
       call set_prate_tile(Istr,Iend,Jstr,Jend)
-
 #   endif
 #  else
 !
@@ -273,15 +272,14 @@
       call set_srflux_tile (Istr,Iend,Jstr,Jend)
 #    endif
 #   endif
+#  endif /* BULK_FLUX */
 
 !---------------------------------------------------------------
 ! Atmospheric dust deposition flux [kg/m2/month]
 !---------------------------------------------------------------
-#   if defined BIOLOGY && defined PZEFTFE
-         call set_dust_tile(Istr,Iend,Jstr,Jend)
-#   endif
-
-#  endif /* BULK_FLUX */
+# if defined BIOLOGY && (defined PZEFTFE || defined BIO_NPZDDISC)
+       call set_dust_tile(Istr,Iend,Jstr,Jend)
+# endif
 
 !
 !---------------------------------------------------------------
@@ -596,7 +594,7 @@
      &                                      stflx(START_2D_ARRAY,itemp))
       call exchange_r2d_tile (Istr,Iend,Jstr,Jend,srflx(START_2D_ARRAY))
 
-#   if defined BIOLOGY && defined PZEFTFE
+#   if defined BIOLOGY && (defined PZEFTFE || defined BIO_NPZDDISC)
       call exchange_r2d_tile (Istr,Iend,Jstr,Jend, dust(START_2D_ARRAY))
 #   endif
 
