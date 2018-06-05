@@ -1,15 +1,15 @@
 nameit <- 'NPacS1_0.1'
 setwd(paste0('~/Roms_tools/Run/',nameit))
 source('~/Roms_tools/Rscripts/get_roms_data.R')
-#install.packages('devtools',repos='https://cran.ism.ac.jp/')
+install.packages('plotrix',repos='https://cran.ism.ac.jp/')
 library(plot3D)
 library(ggplot2)
 library(plotrix) #For Taylor diagram
 
 #Read file
 nameit  <- 'npacS'
-avgfile <- paste0(nameit,'_avg1.nc')
-biofile <- paste0(nameit,'_dbio_avg1.nc')
+avgfile <- paste0(nameit,'_avg.nc')
+biofile <- paste0(nameit,'_dbio_avg.nc')
 
 #Get 'surface area'
 pm      <- ncread(avgfile,'pm')  #Unit: m-1
@@ -54,6 +54,14 @@ DET     <- ncread(avgfile, 'DET')
 DFe     <- ncread(avgfile, 'DFE')
 DETFe   <- ncread(avgfile, 'DETFe')
 
+#Compare model outputs with time series observational data
+HOT_DIN <- '~/Working/FlexEFT1D/HOT/HOT_TIN.dat'
+HOT_CHL <- '~/Working/FlexEFT1D/HOT/HOT_CHL.dat'
+HOT_DIN <- read.table(HOT_DIN, header = T)
+HOT_CHL <- read.table(HOT_CHL, header = T)
+
+HOT_DIN <- HOT_DIN[HOT_DIN$Depth <= 5, ]
+HOT_CHL <- HOT_CHL[HOT_CHL$Depth <= 5, ]
 source('~/Roms_tools/Rscripts/inventory.R')
 #Retrieve annual surface mean data:
 Sur_mean <- function(ncfile, VAR){
