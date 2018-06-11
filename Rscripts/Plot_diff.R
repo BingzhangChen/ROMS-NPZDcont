@@ -67,9 +67,6 @@ image2D(NPP.dff, Lon, Lat,
          xlab = "Longitude (ºE)", ylab = "Latitude (ºN)")
 DRAW()
 #mtext('a) NPP log ratio of high vs. low diversity', adj=0, line = .5)
-lon1 = seq(100,280,by=20)
-lon2 = lon1
-lon2[lon2>180]=lon2[lon2>180]-360
 axis(side=1, at = lon1, labels=lon2)
 
 #image2D(f2, col = jet.colors(20),  # zlim = c(0,.05), 

@@ -1,6 +1,4 @@
-#Get obs. data:
-library(Rcpp)
-sourceCpp('~/Roms_tools/Rscripts/integNPP.cpp')
+source('~/Roms_tools/Rscripts/common.R')
 clmname <- paste0(nameit, '-clim.nc') 
 NO3clm  <- ncread(clmname, 'NO3')
 Nz      <- dim(NO3clm)[3]
@@ -39,51 +37,7 @@ vgpm.a[mask == 0] <- NA
 cbpm.a  <- apply(cbpm, c(1,2), mean)
 cbpm.a[mask == 0] <- NA
 
-#Get depth integrated NPP (model)
-#ROMS outputs of NPP
-#Vertical integration
-vinteg <- function(biofile, var = 'oPPt'){
-   NPPm <- ncread(biofile, var, 
-                  start = c(1,1,1,NMo[1]), 
-                  count = c(L,M,Nroms,length(NMo)))  
-   NPPI <- integC(L, M, length(NMo), Nroms, Depth, Hz, NPPm)
-   #NPPI <- array(0, dim = c(L, M, 12)) #Integrated NPP to be calculated (unit: mgC m-2 d-1)
-   #
-   ##Integrate:
-   #for (i in 1:L){
-   #    for (j in 1:M){
-   #         dep <- Depth[i,j,]   #Depth profile
-   #         w   <- dep > -260
-   #        for (k in 1:12){
-   #            npp         <- NPPm[i,j,w,k]  #NPP depth profile
-   #            NPPI[i,j,k] <- NPPI[i,j,k] +
-   #                           sum(npp*Hz[i,j,w])*mask[i,j] #Unit: mgC m-2 d-1
-   #        }
-   #    }
-   #}
-   NPPI      <- array(NPPI, c(L, M, length(NMo)))
-   NPPI[,1,] <- NA  #Remove data from the south boundary
-   dat       <- MASK(NPPI)
-   return(dat)
-}
 
-#Calculate the annual mean NPP integrated over the vertical water column
-integann <- function(biofile, var = 'oPPt'){
-   NPP_               <- vinteg(biofile)
-   NPP_ann            <- apply(NPP_, c(1,2), mean)
-   NPP_ann[mask == 0] <- NA 
-   return(NPP_ann)
-}
-integT <- function(biofile, var = 'oPPt'){
-   dat <- vinteg(biofile, var)
-   for (i in 1:dim(dat)[3]){
-       dat[,,i] <- dat[,,i]/(pm*pn)
-   }
-   dat <- apply(dat, c(1,2), mean)
-   dat <- sum(dat,na.rm=T)*365   #Unit: mgC y-1
-   dat <- dat/1E18    #Unit: PetagC y-1 = 10^15 gC y-1
-   return(dat)
-}
 NPPI  <- vinteg(biofile)
 NPP.m <- NPPI
 vgpm  <- MASK(vgpm)

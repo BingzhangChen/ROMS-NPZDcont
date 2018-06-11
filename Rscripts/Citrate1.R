@@ -36,16 +36,6 @@ Sur_mean <- function(ncfile, VAR){
    return(DAT.a)
 }
 #Get surface data of modeled data:
-MASK <- function(dat){
-   NT <- dim(dat)[3]
-   for (i in 1:NT){
-       y          <- dat[,,i]
-       y[mask==0] <- NA
-       dat[,,i]   <- y
-   }
-   return(dat)
-}
-
 #Get surface DFe:
 DFe     <- DFe[,,Nroms,NMo]
 

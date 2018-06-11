@@ -132,6 +132,12 @@ sum(x1)
 #Plot out contrasts of spatial variations:
 #1. NPP
 file1='NPP_decomp.pdf'
+NPPname  <- bquote('NPP (mg C '*m^-2*' '*d^-1*')')
+muname   <- bquote(µ*' ('*d^-1*')')
+QNname   <- 'N:C (mol : mol)'
+PHYname  <- bquote('Phyto. biomass (mmol N '*m^-3*')')
+VARname  <- expression(paste("Size variance "*'(ln '*µm^3*')'^2))
+
 pdf(file1,width=6, height=8)
 op <- par( font.lab  = 1,
              family  ="serif",
@@ -141,40 +147,115 @@ op <- par( font.lab  = 1,
              pch     = 16,
              cex.axis= 1.4,
              cex.lab = 1.4,
-             mfrow   = c(1,1))
+             mfrow   = c(4,2))
    NPPmax   <- 1.6E3
-   NPP_ann0 <- integann(biofiles0, 'oPPt')
-   NPP_ann1 <- integann(biofiles1, 'oPPt')
+   NPP_ann0 <- integann(biofile0, 'oPPt')
+   NPP_ann1 <- integann(biofile1, 'oPPt')
    NPP_ann0[NPP_ann0 > NPPmax] <- NPPmax
    NPP_ann1[NPP_ann1 > NPPmax] <- NPPmax
 
    image2D(NPP_ann0, Lon, Lat,    
-              col = jet.colors(18),   zlim = c(0,8), 
+              col = jet.colors(18),   zlim = c(0,NPPmax), 
              xaxt = 'n',frame = F,
              xlab = "", ylab = "")
    axis(side=1, at = lon1, labels=lon2)
 
    image2D(NPP_ann1, Lon, Lat,    
-              col = jet.colors(18),   zlim = c(0,8), 
+              col = jet.colors(18),   zlim = c(0,NPPmax), 
              xaxt = 'n',frame = F,
              xlab = "", ylab = "")
    axis(side=1, at = lon1, labels=lon2)
 
-
-#2. PHY biomass
-    cff <- apply(cff, c(1,2), mean)
-   image2D(cff, Lon, Lat,    #Modeled size variance
-             col = jet.colors(18),   zlim = c(0,8), 
+#2. surface PHY biomass
+   PHYmax <- 1
+   cff <- apply(PHY0[,,Nroms,], c(1,2), mean)
+   cff[cff > PHYmax] <- PHYmax
+   cff[cff <= 0]     <- NA
+   cff[,1]           <- NA
+   image2D(cff, Lon, Lat,    
+             col = jet.colors(18),   zlim = c(0,PHYmax), 
             xaxt = 'n',frame = F,
             xlab = "", ylab = "")
    axis(side=1, at = lon1, labels=lon2)
 
-#2. Growth rate at mean size
+   cff <- apply(PHY1[,,Nroms,], c(1,2), mean)
+   cff[cff > PHYmax] <- PHYmax
+   cff[cff <= 0]     <- NA
+   cff[,1]           <- NA
+   image2D(cff, Lon, Lat,    
+             col = jet.colors(18),   zlim = c(0,PHYmax), 
+            xaxt = 'n',frame = F,
+            xlab = "", ylab = "")
+   axis(side=1, at = lon1, labels=lon2)
 
-#3. QN at mean size
+#3. Growth rate at mean size
+   mumax <- 1
+   cff <- apply(mu0[,,Nroms,], c(1,2), mean)
+   cff[cff > mumax] <- mumax
+   cff[cff <= 0]    <- NA
+   cff[,1]          <- NA
+   image2D(cff, Lon, Lat,    
+             col = jet.colors(18),   zlim = c(0,mumax), 
+            xaxt = 'n',frame = F,
+            xlab = "", ylab = "")
+   axis(side=1, at = lon1, labels=lon2)
 
-#4. Variance
+   cff <- apply(mu1[,,Nroms,], c(1,2), mean)
+   cff[cff > mumax] <- mumax
+   cff[cff <= 0]     <- NA
+   cff[,1]           <- NA
+   image2D(cff, Lon, Lat,    
+             col = jet.colors(18),   zlim = c(0,mumax), 
+            xaxt = 'n',frame = F,
+            xlab = "", ylab = "")
+   axis(side=1, at = lon1, labels=lon2)
 
-#5. d2mu_QNdL2
+#4. QN at mean size
+   QNmax <- .18
+   QNmin <- 0.04
+   cff <- apply(QN0[,,Nroms,], c(1,2), mean)
+   cff[cff > QNmax] <- QNmax
+   cff[cff <= 0]    <- NA
+   cff[,1]          <- NA
+   image2D(cff, Lon, Lat,    
+             col = jet.colors(18),   zlim = c(QNmin,QNmax), 
+            xaxt = 'n',frame = F,
+            xlab = "", ylab = "")
+   axis(side=1, at = lon1, labels=lon2)
+
+   cff <- apply(QN1[,,Nroms,], c(1,2), mean)
+   cff[cff > QNmax] <- QNmax
+   cff[cff <= 0]     <- NA
+   cff[,1]           <- NA
+   image2D(cff, Lon, Lat,    
+             col = jet.colors(18),   zlim = c(QNmin,QNmax), 
+            xaxt = 'n',frame = F,
+            xlab = "", ylab = "")
+   axis(side=1, at = lon1, labels=lon2)
+
+#5. Variance
+   VARmax <- 8
+   VARmin <- 0
+   cff <- apply(VAR0[,,Nroms,], c(1,2), mean)
+   cff[cff > VARmax] <- VARmax
+   cff[cff <= 0]    <- NA
+   cff[,1]          <- NA
+   image2D(cff, Lon, Lat,    
+             col = jet.colors(18),   zlim = c(VARmin,VARmax), 
+            xaxt = 'n',frame = F,
+            xlab = "", ylab = "")
+   axis(side=1, at = lon1, labels=lon2)
+   mtext(Varname,adj = -0.3, cex=.8)
+
+   cff <- apply(VAR1[,,Nroms,], c(1,2), mean)
+   cff[cff > VARmax] <- VARmax
+   cff[cff <= 0]     <- NA
+   cff[,1]           <- NA
+   image2D(cff, Lon, Lat,    
+             col = jet.colors(18),   zlim = c(VARmin,VARmax), 
+            xaxt = 'n',frame = F,
+            xlab = "", ylab = "")
+   axis(side=1, at = lon1, labels=lon2)
 
 
+dev.off()
