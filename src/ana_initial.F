@@ -519,11 +519,13 @@ C$    integer omp_get_thread_num
             t(i,j,k,1,iO2)=250.0
             t(i,j,k,2,iO2)=t(i,j,k,1,iO2)
 #     endif
-#  elif defined BIO_NPZDDISC || defined BIO_EFTDISC
+#  elif (defined BIO_NPZDDISC || defined BIO_EFTDISC)
             t(i,j,k,1,iZOO1)=0.1
             t(i,j,k,2,iZOO1)=0.1
             t(i,j,k,1,iDet1)=0.02
             t(i,j,k,2,iDet1)=t(i,j,k,1,iDet1)
+            t(i,j,k,1,iDet2)=1D-6
+            t(i,j,k,2,iDet2)=t(i,j,k,1,iDet2)
             do ii=1,NPHY
                t(i,j,k,1,iPHY1(ii)) = 0.1/real(NPHY)
                t(i,j,k,2,iPHY1(ii)) = 0.1/real(NPHY)

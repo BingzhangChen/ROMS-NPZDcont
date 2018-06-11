@@ -554,7 +554,7 @@ C$    integer omp_get_thread_num
           srflxg(i,j,2)=init
 # endif
 
-# if defined BIOLOGY && defined PZEFTFE
+# if defined BIOLOGY && (defined PZEFTFE || defined BIO_NPZDDISC)
           dust(i,j)=init
 #    ifdef AVERAGES
           dust_avg(i,j)=init
@@ -1019,10 +1019,10 @@ C$    integer omp_get_thread_num
           u10(i,j)=init
           Kv_O2(i,j)=init
           O2satu(i,j)=init
-#  elif defined BIO_PZEFT || defined PZEFTFE
+#  elif (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
 !  Initialize QAvg and ThetaAvg
           Qbulk(i,j,:)=init
-          Thetabulk(i,j,:)=init
+          CHL(i,j,:)=init
 #  elif defined BIO_EFTDISC
              QN(i,j,:,:) = 0.15
           THETA(i,j,:,:) = 0.24
@@ -1036,9 +1036,9 @@ C$    integer omp_get_thread_num
           u10_avg(i,j)=init
           Kv_O2_avg(i,j)=init
           O2satu_avg(i,j)=init
-#   elif defined BIO_PZEFT  || defined PZEFTFE
+#   elif defined (BIO_PZEFT  || defined PZEFTFE || defined BIO_NPZDDISC)
           Qbulk_avg(i,j,:)=init
-          Thetabulk_avg(i,j,:)=init
+          CHL_avg(i,j,:)=init
 #  endif
 # endif
         enddo

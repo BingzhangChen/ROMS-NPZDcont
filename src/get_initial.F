@@ -17,9 +17,8 @@
 #ifdef OA_COUPLING
 #include "mpi_roms.h"
 #endif
-
       real time_scale
-      integer itrc
+      integer itrc,i,j
 #if defined SEDIMENT || defined BBL
      &      ,  indxWrk
 #endif
@@ -245,13 +244,18 @@
         got_tini(itrc)=.true.
 
         lvar=lenstr(vname(1,indxT+itrc-1))
-
         ierr=nf_inq_varid (ncid, vname(1,indxT+itrc-1)(1:lvar),
      &                                                    varid)
         if (ierr .eq. nf_noerr) then
           ierr=nf_fread (t(START_2D_ARRAY,1,1,itrc), ncid,  varid,
      &                                               indx, r3dvar)
 
+#       ifdef DEBUG_BIO2
+           !if (mynode .eq. 0) then
+           !  write(stdout,*) 'Vname = ',vname(1,indxT+itrc-1)(1:lvar)
+           !  write(stdout,*) 'Value = ',t(5,5,1,1,itrc)
+           !endif
+#       endif
           if (ierr .ne. nf_noerr) then
             write(stdout,2) vname(1,indxT+itrc-1)(1:lvar), indx,
      &                                              ininame(1:lstr)

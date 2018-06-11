@@ -97,9 +97,9 @@
 #     define vidKvO2 hisKvO2
 #     define vidO2sat hisO2sat
 #   endif
-#  elif defined BIO_PZEFT || defined PZEFTFE
+#  elif (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
 #     define vidQ hisQ
-#     define vidTheta hisTheta
+#     define vidCHL hisCHL
 #  elif defined BIO_BioEBUS 
 #   define vidAOU hisAOU 		
 #   define vidwind10 hiswind10 	
@@ -163,9 +163,9 @@
 #    define vidKvO2 avgKvO2
 #    define vidO2sat avgO2sat
 #   endif
-#  elif defined BIO_PZEFT || defined PZEFTFE
+#  elif (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
 #    define vidQ avgQ
-#    define vidTheta avgTheta
+#    define vidCHL avgCHL
 #  elif defined BIO_BioEBUS
 #   define vidAOU avgAOU		
 #   define vidwind10 avgwind10	
@@ -1342,7 +1342,7 @@
 !
 ! Chlorophyll/Carbon ratio
 !
-#  if defined BIO_PZEFT || defined PZEFTFE
+#  if (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
         if (wrt(indxQ)) then
           lvar=lenstr(vname(1,indxQ))
           ierr=nf_def_var (ncid, vname(1,indxQ)(1:lvar),
@@ -1366,28 +1366,28 @@
           call nf_add_attribute(ncid, vidQ, indxQ, 5, NF_REAL, ierr)
        endif
 
-        if (wrt(indxTheta)) then
-          lvar=lenstr(vname(1,indxTheta))
-          ierr=nf_def_var (ncid, vname(1,indxTheta)(1:lvar),
-     &                             NF_REAL, 4, r3dgrd, vidTheta)
+        if (wrt(indxCHL)) then
+          lvar=lenstr(vname(1,indxCHL))
+          ierr=nf_def_var (ncid, vname(1,indxCHL)(1:lvar),
+     &                             NF_REAL, 4, r3dgrd, vidCHL)
 #   ifndef AVRH
-          lvar=lenstr(vname(2,indxTheta))
-          ierr=nf_put_att_text (ncid, vidTheta, 'long_name', lvar,
-     &                                  vname(2,indxTheta)(1:lvar))
+          lvar=lenstr(vname(2,indxCHL))
+          ierr=nf_put_att_text (ncid, vidCHL, 'long_name', lvar,
+     &                                  vname(2,indxCHL)(1:lvar))
 #   else
-          text='averaged '/ /vname(2,indxTheta)
+          text='averaged '/ /vname(2,indxCHL)
           lvar=lenstr(text)
-          ierr=nf_put_att_text (ncid, vidTheta, 'long_name', lvar,
+          ierr=nf_put_att_text (ncid, vidCHL, 'long_name', lvar,
      &                                              text(1:lvar))
 #   endif
-          lvar=lenstr(vname(3,indxTheta))
-          ierr=nf_put_att_text (ncid, vidTheta, 'units',     lvar,
-     &                                  vname(3,indxTheta)(1:lvar))
-          lvar=lenstr(vname(4,indxTheta))
-          ierr=nf_put_att_text (ncid, vidTheta, 'field',     lvar,
-     &                                  vname(4,indxTheta)(1:lvar))
+          lvar=lenstr(vname(3,indxCHL))
+          ierr=nf_put_att_text (ncid, vidCHL, 'units',     lvar,
+     &                                  vname(3,indxCHL)(1:lvar))
+          lvar=lenstr(vname(4,indxCHL))
+          ierr=nf_put_att_text (ncid, vidCHL, 'field',     lvar,
+     &                                  vname(4,indxCHL)(1:lvar))
 
-          call nf_add_attribute(ncid, vidTheta, indxTheta, 5, NF_REAL, ierr)
+          call nf_add_attribute(ncid, vidCHL, indxCHL,5,NF_REAL,ierr)
 
        endif
 #  elif defined BIO_NChlPZD
@@ -2368,7 +2368,7 @@
         endif
 !
 !
-#  if defined BIO_PZEFT || defined PZEFTFE
+#  if (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
         if (wrt(indxQ)) then
           lvar=lenstr(vname(1,indxQ))
 ! This is a function to return to the variable ID in the nc file
@@ -2379,11 +2379,11 @@
           endif
         endif
 
-        if (wrt(indxTheta)) then
-          lvar=lenstr(vname(1,indxTheta))
-          ierr=nf_inq_varid(ncid,vname(1,indxTheta)(1:lvar), vidTheta)
+        if (wrt(indxCHL)) then
+          lvar=lenstr(vname(1,indxCHL))
+          ierr=nf_inq_varid(ncid,vname(1,indxCHL)(1:lvar), vidCHL)
           if (ierr .ne. nf_noerr) then
-          write(stdout,1) vname(1,indxTheta)(1:lvar), ncname(1:lstr)
+          write(stdout,1) vname(1,indxCHL)(1:lvar), ncname(1:lstr)
             goto 99                                       !--> ERROR
           endif
         endif
@@ -2718,9 +2718,9 @@
 #   undef vidKvO2
 #   undef vidO2sat
 #  endif
-# elif defined BIO_PZEFT || defined PZEFTFE
+# elif (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
 #   undef vidQ
-#   undef vidTheta
+#   undef vidCHL
 # elif defined BIO_BioEBUS
 #  undef vidAOU 
 #  undef vidwind10	

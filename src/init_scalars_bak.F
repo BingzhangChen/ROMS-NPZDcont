@@ -637,7 +637,7 @@ CR      write(stdout,'(1x,A,I3)') 'indxTPAS = ',indxTPAS
       vname(6,indxNH4)='lat_rho lon_rho                           '
       vname(7,indxNH4)='                                          '
 !=====================================================================
-#  elif (defined BIO_NPZDDISC || defined BIO_EFTDISC)
+#  elif defined BIO_NPZDDISC || defined BIO_EFTDISC
 
       PMU_(1) = PMU_min
        dx     = (PMU_max-PMU_min)/dble(NPHY-1)
@@ -646,6 +646,16 @@ CR      write(stdout,'(1x,A,I3)') 'indxTPAS = ',indxTPAS
          PMU_(iPHYid) = PMU_(iPHYid-1)+dx
       enddo
       
+      ! Define iPHY1, NT, and NumFluxTerms
+      do iPHYid = 1, NPHY
+         iPHY1(iPHYid) = iNO3_ + iPHYid
+      enddo
+
+!      NumFluxTerms=oPPt (20 + 20 + 20 + 21=81)
+
+      iZOO1=iPHY1(NPHY)+1
+      iDET1=iZOO1+1
+
 CR      write(stdout,'(1x,A,I3)') 'indxNO3 =',indxNO3
       vname(1,indxNO3)='NO3                                       '
       vname(2,indxNO3)='NO3 Nutrient                              '
@@ -1566,7 +1576,7 @@ CR      write(stdout,'(1x,A,I3)') 'indxHel =',indxHel
       vname(5,indxHel)='                                          '
       vname(6,indxHel)='lat_rho lon_rho                           '
       vname(7,indxHel)='                                          '
-#  if (defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC)
+#  if defined BIO_PZEFT || defined PZEFTFE || defined BIO_NPZDDISC
 CR      write(stdout,'(1x,A,I3)') 'indxQ =',indxQ
       vname(1,indxQ)='Qbulk                                     '
       vname(2,indxQ)='N:C ratio of bulk phytoplankton           '
@@ -2862,13 +2872,13 @@ CR     &                          ,indxbioFlux+NFlux_NewProd-1
 ! vertical sinking terms
 CR      write(stdout,'(1x,A,I3)') 'indxbioVSink(NFlux_VSinkD1)='
 CR     &                          ,indxbioVSink+NFlux_VSinkD1-1
-      vname(1,indxbioVSink+NFlux_VSinkDET1-1)=
+      vname(1,indxbioVSink+NFlux_VSinkD1-1)=
      &     'NFlux_VSinkD1                   '              
-      vname(2,indxbioVSink+NFlux_VSinkDET1-1)=
+      vname(2,indxbioVSink+NFlux_VSinkD1-1)=
      &     'Vertical sinking flux of detritus N'           
-      vname(3,indxbioVSink+NFlux_VSinkDET1-1)=
+      vname(3,indxbioVSink+NFlux_VSinkD1-1)=
      &     'mmol N m-3 s-1                  '              
-      vname(4,indxbioVSink+NFlux_VSinkDET1-1)=
+      vname(4,indxbioVSink+NFlux_VSinkD1-1)=
      &     'NFlux_VSinkD1, scalar, series   '                
       
       vname(1,indxbioVSink+NFlux_VSinkDET2-1)=
@@ -2878,23 +2888,8 @@ CR     &                          ,indxbioVSink+NFlux_VSinkD1-1
       vname(3,indxbioVSink+NFlux_VSinkDET2-1)=
      &     'mmol N m-3 s-1                  '              
       vname(4,indxbioVSink+NFlux_VSinkDET2-1)=
-     &     'NFlux_VSinkD2, scalar, series   '                
+     &     'NFlux_VSinkD1, scalar, series   '                
 
-      vname(1,indxbioFlux+oPAR-1)='oPAR'
-      vname(2,indxbioFlux+oPAR-1)=
-     &  'Real PAR                          '     
-      vname(3,indxbioFlux+oPAR-1)=
-     &  'W m-2                      '    
-      vname(4,indxbioFlux+oPAR-1)=
-     &  'PAR, scalar, series     '    
-
-      vname(1,indxbioFlux+otheta-1)='otheta'
-      vname(2,indxbioFlux+otheta-1)=
-     &  'Chl:C ratio                       '     
-      vname(3,indxbioFlux+oPAR-1)=
-     &  'gChl molC-1                       '    
-      vname(4,indxbioFlux+oPAR-1)=
-     &  'Theta, scalar, series             '    
 
 #  ifdef OXYGEN
 !     gas exchange terms
