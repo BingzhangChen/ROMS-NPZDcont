@@ -36,7 +36,6 @@ system.time(
     }
 )
 
-
 pdf('TNPP_VTR.pdf',width=5, height=5,paper = 'a4')
 op <- par( font.lab  = 1,
              family  ="serif",
@@ -66,6 +65,22 @@ meanVAR  <- function(file){
    return(list(VAR=VAR.a, LNV=LNV.b))
 }
 
+#Calculate PHY at different coefficints (not considering replicates):
+muAvg <- function(avgfile, biofile){
+   PHY.a   <- Sur_mean(avgfile, 'PHYTO')
+    mu.a   <- Sur_mean(biofile, 'omuNet')
+   d2mudL2 <- Sur_mean(biofile, 'od2mudl2')
+   LNV.a   <- Sur_mean(avgfile, 'LNV')
+    VAR.a  <- Sur_mean(avgfile, 'VAR')
+    LNV.a  <- LNV.a/PHY.a
+    VAR.a  <- VAR.a/PHY.a - LNV.a^2
+    muAvg  <- mu.a + d2mudL2*VAR.a/2
+    return(muAvg)
+}
+muAvg0   <- muAvg(avgfile0, biofile0)
+muAvg1   <- muAvg(avgfile1, biofile1)
+
+#This is for Fig. 2 in the main MS
 pdf('Compare_TD_KTW.pdf',width=8, height=6,paper='a4')
 op <- par( font.lab  = 1,
              family  ="serif",
@@ -149,6 +164,4 @@ for (i in 1:ncol(avgFiles)){
 mtext('Longitude (ºE)',side=1, outer=T, line=1)
 mtext('Latitude  (ºN)',side=2, outer=T, line=1)
 dev.off()
-
-
 
