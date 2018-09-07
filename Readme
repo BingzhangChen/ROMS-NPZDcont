@@ -1,0 +1,46 @@
+This file is to explain the model data and source codes for the paper entitled "Effect of phytoplankton size diversity on primary productivity in the North Pacific: trait distributions under environmental variability" published on Ecology Letters.
+
+Author: Bingzhang Chen
+Date: Sept. 7, 2018
+Contact email: bingzhang.chen@gmail.com
+
+########Source code###########
+All the source codes are stored under the directory src/.
+
+Important files:
+bio_NPZDcontFe.F : The main subroutine to perform the phytoplankton continuous size model embeded within the NPZD-Iron model (CITRATE model; Chen and Smith GMD 2018) within the 3D ROMS model. 
+
+PZEFTFe.F : A module file containing some important functions and subroutines supporting bio_NPZDcontFe.F including calculating the 1st to 4th derivatives of phytoplankton growth rate against size evaluated at mean size and the iron cycle. 
+
+#######Model data############
+As described in the paper, a total of 11 simulations were run. But the most important simulations are for low diversity (u = alphaG = 0) and high diversity (u =0.1 or alphaG = 0.1). Most of the figures (except Fig. 1) were generated from these three simulations. Therefore, only the model data of these three simulations were shared on GitHub (DOI attached) due to huge size of the netcdf files. Other files are available upon request.
+
+One folder has been created for each simulation: NPacS1_0.1 for u = 0.1 and alphaG = 0; NPacS1_0 for u = 0 and alphaG = 0; NPacS1_KTW_0.1 for u =0 and alphaG=0.01.
+
+Within each folder, there are two .nc files, which contain all the ten-year simulations of biological data. Below are the definitions for the relevant variables:
+
+File name: tracers.nc
+
+NO3: nitrate
+PHYTO: phytoplankton biomass
+CHL: Chlorophyll a concentration
+LNV: phytoplankton mean cell volume
+VAR: variance of phytoplankton cell volume
+DFE: dissolved iron concentration
+DETFe: detrital iron
+ZOO: Zooplankton biomass
+Qbulk: the nitrogen-to-carbon ratio of the phytoplankton community
+
+The file NPP.nc contains several other important phytoplankton attributes including:
+oPPt: Carbon based primary production on the community level
+omuNet: phytoplankton per capita growth rate of the mean size
+oQN: phytoplankton nitrogen-to-carbon ratio of phytoplankton mean size
+otheta: phytoplankton chlorophyll-to-carbon ratio of phytoplankton mean size
+
+
+#######Observational data############
+The file clim.nc within the folder of NPacS contains the observational data of nitrate, chlorphyll, and primary production.
+
+The file size_Chl.csv contains all the size-fractionated Chl data from Maranon et al. L&O (2012).
+
+
