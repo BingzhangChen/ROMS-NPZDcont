@@ -1,49 +1,15 @@
-nameit <- 'NPacS1_0.1'
-setwd(paste0('~/Roms_tools/Run/',nameit))
-source('~/Roms_tools/Rscripts/get_roms_data.R')
-#install.packages('devtools',repos='https://cran.ism.ac.jp/')
-library(plot3D)
-library(ggplot2)
-library(plotrix) #For Taylor diagram
-
-#Read file
-nameit  <- 'npacS'
-avgfile <- paste0(nameit,'_avg1.nc')
-biofile <- paste0(nameit,'_dbio_avg1.nc')
-
-#Get 'surface area'
-pm      <- ncread(avgfile,'pm')  #Unit: m-1
-pn      <- ncread(avgfile,'pn')
-
-#Get depth of ROMS
-CFF     <- readnc('NO3_roms', avgfile, nameit='npacS',ROMS=T)
-Hz      <- CFF$Hz
-Depth   <- CFF$depth
-Nroms   <- dim(Depth)[3]
-time    <- ncread(avgfile, 'time_step')
-time    <- time[1, ] #Time step from initialization (0 year, Jan 1)
-dt      <- 1200      #a time step
-days    <- as.integer(time*dt/86400)
-year    <- days/365
-
-#Get final year
-NMo     <- length(days)
-NMo     <- (NMo-11):NMo
-#Get mask:
-mask    <- ncread(avgfile,'mask_rho')
-NO3_s   <- get_sur('NO3_roms', file = avgfile, nameit = 'npacS')
-Lon     <- NO3_s$Lon
-Lat     <- NO3_s$Lat
-L       <- length(Lon)
-M       <- length(Lat)
-
+source('~/Roms_tools/Rscripts/commons.R')
 # ROMS avg. model data
 #Nf  <- system('ls npacific_avg_*.nc | wc -l')
 #pat = paste0(nameit,"_avg_*.nc")
 #f   = list.files(pattern = pat)
 #Calculate total N:
 
+NM      <- length(NMo)  #Number of months
 NO3     <- ncread(avgfile, 'NO3', 
+                  start = c(1,1,    1,NMo[1]),
+                  count = c(L,M,Nroms,length(NMo)))
+CHL     <- ncread(avgfile, 'CHL', 
                   start = c(1,1,    1,NMo[1]),
                   count = c(L,M,Nroms,length(NMo)))
 PHY     <- ncread(avgfile, 'PHYTO',
@@ -53,6 +19,9 @@ ZOO     <- ncread(avgfile, 'ZOO')
 DET     <- ncread(avgfile, 'DET')
 DFe     <- ncread(avgfile, 'DFE')
 DETFe   <- ncread(avgfile, 'DETFe')
+
+#Compare model outputs with time series observational data of JGOFS
+source('~/Roms_tools/Rscripts/jgofs.R')
 
 source('~/Roms_tools/Rscripts/inventory.R')
 #Retrieve annual surface mean data:
@@ -67,16 +36,6 @@ Sur_mean <- function(ncfile, VAR){
    return(DAT.a)
 }
 #Get surface data of modeled data:
-MASK <- function(dat){
-   NT <- dim(dat)[3]
-   for (i in 1:NT){
-       y          <- dat[,,i]
-       y[mask==0] <- NA
-       dat[,,i]   <- y
-   }
-   return(dat)
-}
-
 #Get surface DFe:
 DFe     <- DFe[,,Nroms,NMo]
 
@@ -168,8 +127,10 @@ pdf('NO3_var_mu_diff.pdf',width=5, height=4,paper='a4')
 op <- par( font.lab  = 1,
              family  ="serif",
              mar     = c(4,4,1,1),
+             oma     = c(2,2,2,2),
              mgp     = c(2.3,1,0),
              cex.lab = 1.2,
+             cex.axis= 1.2,
              pch     = 16,
              mfrow   = c(1,2))
   #NPP.dff1 <- log(muAvg.ann/muAvg1.ann)
